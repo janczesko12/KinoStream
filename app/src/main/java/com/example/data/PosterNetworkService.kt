@@ -489,6 +489,81 @@ object PosterNetworkService {
      * Live searches TVMaze (TV series) and Apple iTunes PL (Movies) for any user query,
      * returning only series & movies with Polish dubbing.
      */
+    /**
+     * Loads complete TVMaze catalogue pages (up to 250 shows per page), not just the first
+     * few search matches. The source provides metadata/posters; it does not verify Polish dubbing,
+     * Filmweb scores, or availability on Polish VOD platforms.
+     */
+    suspend fun discoverTvMazeCatalogPages(maxPages: Int = 4): List<Movie> = withContext(Dispatchers.IO) {
+        val discovered = mutableListOf<Movie>()
+        for (page in 0 until maxPages.coerceIn(1, 8)) {
+            try {
+                val request = Request.Builder()
+                    .url("https://api.tvmaze.com/shows?page=$page")
+                    .header("User-Agent", "Mozilla/5.0 (Android; KinoStream/1.0)")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use
+                    val body = response.body?.string() ?: return@use
+                    val array = JSONArray(body)
+                    for (i in 0 until array.length()) {
+                        val show = array.optJSONObject(i) ?: continue
+                        val rawName = show.optString("name", "").trim()
+                        if (rawName.isBlank()) continue
+                        val polishName = localizeTitleToPolish(rawName, isSeries = true)
+                        if (!hasPolishDubbingForTitle(polishName, rawName)) continue
+
+                        val imageObj = show.optJSONObject("image")
+                        val imageUrl = imageObj?.optString("original", "").orEmpty()
+                            .ifBlank { imageObj?.optString("medium", "").orEmpty() }
+                            .replace("http://", "https://")
+                        val premiered = show.optString("premiered", "")
+                        val year = premiered.take(4).toIntOrNull() ?: 0
+                        val ratingObj = show.optJSONObject("rating")
+                        val sourceRating = ratingObj?.optDouble("average", 0.0) ?: 0.0
+                        val rating = if (sourceRating.isNaN() || sourceRating <= 0.0) 0.0
+                            else kotlin.math.round(sourceRating * 10.0) / 10.0
+                        val genresArr = show.optJSONArray("genres")
+                        val firstGenre = if (genresArr != null && genresArr.length() > 0) genresArr.optString(0) else ""
+                        val networkName = show.optJSONObject("webChannel")?.optString("name", "")
+                            ?: show.optJSONObject("network")?.optString("name", "") ?: ""
+                        val runtime = show.optInt("averageRuntime", 50).takeIf { it > 0 } ?: 50
+
+                        discovered.add(
+                            Movie(
+                                id = "tvmaze-${show.optInt("id", page * 250 + i)}",
+                                title = polishName,
+                                originalTitle = rawName,
+                                polishTitle = polishName,
+                                year = year,
+                                genre = mapGenre(firstGenre),
+                                filmwebRating = rating,
+                                filmwebVotesCount = 0,
+                                ratingSource = if (rating > 0.0) MovieRatingSource.TVMAZE else MovieRatingSource.NONE,
+                                isAvailabilityVerified = false,
+                                platforms = mapPlatforms(networkName, rawName),
+                                durationMinutes = runtime,
+                                director = "Brak danych",
+                                cast = emptyList(),
+                                description = "Metadane serialu z TVMaze. Ocena jest oceną TVMaze, a nie Filmweb. Polska wersja językowa i dostępność w Polsce nie zostały zweryfikowane.",
+                                posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
+                                posterEmoji = "📺",
+                                posterUrl = imageUrl,
+                                backdropUrl = imageUrl,
+                                isSeries = true,
+                                hasPolishDubbing = true,
+                                ageRating = "Brak danych"
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // One failed page should not block discovery from the remaining pages.
+            }
+        }
+        discovered
+    }
+
     suspend fun searchLiveSeriesAndMovies(query: String): List<Movie> =
         withContext(Dispatchers.IO) {
             if (query.trim().length < 2) return@withContext emptyList()
@@ -497,7 +572,7 @@ object PosterNetworkService {
                 results.addAll(searchTvMazeShows(query))
             } catch (_: Exception) {}
             try {
-                results.addAll(searchItunesMovies(query, limit = 6))
+                results.addAll(searchItunesMovies(query, limit = 20))
             } catch (_: Exception) {}
             results.filter { it.hasPolishDubbing }
         }
@@ -516,7 +591,7 @@ object PosterNetworkService {
             val array = JSONArray(body)
             val list = mutableListOf<Movie>()
 
-            for (i in 0 until minOf(array.length(), 6)) {
+            for (i in 0 until minOf(array.length(), 25)) {
                 val item = array.getJSONObject(i)
                 val show = item.optJSONObject("show") ?: continue
                 val imageObj = show.optJSONObject("image") ?: continue
