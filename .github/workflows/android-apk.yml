@@ -31,7 +31,7 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      # CI debug APK is only a build/test artifact; production signing stays in Google AI Studio/Play Console.
+      # This key exists only for CI debug builds. It is not a production signing key.
       - name: Generate temporary debug keystore
         run: keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
@@ -48,3 +48,40 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      # Optional: stable signing for APK distribution from the project owner's website.
+      # These secrets are unrelated to Google Play or an API key.
+      - name: Prepare website release signing key
+        id: signing
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$SIGNING_KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_PASSWORD" ]]; then
+            echo "release_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Signed website APK skipped. Configure SIGNING_KEYSTORE_BASE64, STORE_PASSWORD and KEY_PASSWORD to enable it."
+            exit 0
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/release.keystore"
+          test -s "$GITHUB_WORKSPACE/release.keystore"
+          keytool -list -keystore "$GITHUB_WORKSPACE/release.keystore" -storepass "$STORE_PASSWORD" -alias upload
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+          echo "release_ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK for website
+        if: steps.signing.outputs.release_ready == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease
+
+      - name: Upload signed APK for download and website hosting
+        if: steps.signing.outputs.release_ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinostream-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
