@@ -108,10 +108,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var onlineSearchJob: Job? = null
 
     init {
+        // Start verified TMDB/JustWatch discovery immediately so the catalogue does not wait
+        // for title/poster enrichment requests to finish.
+        viewModelScope.launch {
+            repository.discoverMoreMovies()
+        }
         viewModelScope.launch {
             repository.syncPolishStreamingTitles()
             repository.enrichCatalogPosters()
-            repository.discoverMoreMovies()
         }
         viewModelScope.launch {
             if (repository.autoAddNewReleasesEnabled.value) {
