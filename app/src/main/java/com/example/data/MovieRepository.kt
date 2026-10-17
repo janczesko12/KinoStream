@@ -284,7 +284,9 @@ class MovieRepository(
         // An empty response usually means the API key/network is missing; keep existing catalogue and retry later.
         if (verifiedResults.isEmpty()) return@coroutineScope 0
 
-        val existingStatic = _movies.value.filterNot(::isOnlineDiscovery)
+        // Start with the curated catalogue too, even on first launch when only cached
+        // verified provider entries are allowed into the visible StateFlow.
+        val existingStatic = MovieCatalog.sampleMovies.filter { it.hasPolishDubbing }
         val matchedProviderIds = mutableSetOf<String>()
         val verifiedStatic = existingStatic.mapNotNull { local ->
             val matching = verifiedResults.firstOrNull { sameProviderTitle(local, it) }
