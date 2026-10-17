@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -161,7 +162,7 @@ object AppUpdateManager {
                 }
 
                 body.byteStream().use { input ->
-                    temporaryFile.outputStream().buffered().use { output ->
+                    FileOutputStream(temporaryFile, resumeDownload).buffered().use { output ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
                             val read = input.read(buffer)
