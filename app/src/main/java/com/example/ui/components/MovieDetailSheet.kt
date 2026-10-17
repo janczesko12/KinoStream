@@ -370,10 +370,10 @@ fun MovieDetailSheet(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isWithinRange) {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        } else {
-                            FilmwebRed.copy(alpha = 0.10f)
+                        containerColor = when {
+                            !hasFilmwebRating -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            isWithinRange -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            else -> FilmwebRed.copy(alpha = 0.10f)
                         }
                     ),
                     shape = RoundedCornerShape(14.dp),
@@ -404,7 +404,11 @@ fun MovieDetailSheet(
                                 Icon(
                                     imageVector = Icons.Filled.Star,
                                     contentDescription = null,
-                                    tint = if (isWithinRange) FilmwebYellow else FilmwebRed,
+                                    tint = when {
+                                        !movie.hasRating -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        movie.ratingSource != MovieRatingSource.FILMWEB || isWithinRange -> FilmwebYellow
+                                        else -> FilmwebRed
+                                    },
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
@@ -440,10 +444,10 @@ fun MovieDetailSheet(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (isWithinRange) {
-                                        FilmwebGreen.copy(alpha = 0.15f)
-                                    } else {
-                                        FilmwebRed.copy(alpha = 0.15f)
+                                    when {
+                                        !hasFilmwebRating -> MaterialTheme.colorScheme.surfaceVariant
+                                        isWithinRange -> FilmwebGreen.copy(alpha = 0.15f)
+                                        else -> FilmwebRed.copy(alpha = 0.15f)
                                     }
                                 )
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
