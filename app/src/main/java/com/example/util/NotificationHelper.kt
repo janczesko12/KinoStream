@@ -52,9 +52,9 @@ object NotificationHelper {
             ?.let { "Ocena Filmweb: $it/10 ⭐" }
         val expandedText = buildString {
             append(message)
-            append("\\n\\nPlatforma: $platformName")
+            append("\n\nPlatforma: $platformName")
             ratingText?.let {
-                append("\\n")
+                append("\n")
                 append(it)
             }
         }
