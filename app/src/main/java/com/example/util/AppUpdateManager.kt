@@ -143,7 +143,7 @@ object AppUpdateManager {
                 }
 
                 if (downloadedBytes == 0L) throw IOException("Pobrany plik APK jest pusty.")
-                val actualChecksum = digest.digest().joinToString("") { "%02x".format(it) }
+                val actualChecksum = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
                 if (!actualChecksum.equals(update.sha256, ignoreCase = true)) {
                     throw IOException("Weryfikacja APK nie powiodła się. Plik został odrzucony.")
                 }
