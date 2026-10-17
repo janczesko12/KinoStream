@@ -145,7 +145,9 @@ class MovieRepository(
         }.awaitAll()
 
         if (anyUpdated) {
-            _movies.value = updatedList.filter { it.hasPolishDubbing }
+            val discoveries = _movies.value.filter(::isOnlineDiscovery)
+            _movies.value = updatedList.filter { it.hasPolishDubbing } + discoveries
+            persistDiscoveredMovies(discoveries)
         }
     }
 
@@ -393,7 +395,8 @@ class MovieRepository(
         _reminderMovieIds.value.forEach { movieId ->
             val movie = _movies.value.firstOrNull { it.id == movieId } ?: return@forEach
             if (enabled) {
-                PremiereReminderScheduler.schedule(context, movie, _enabledNotificationPlatforms.value)
+                val scheduled = PremiereReminderScheduler.schedule(context, movie, _enabledNotificationPlatforms.value)
+                if (!scheduled) PremiereReminderScheduler.cancel(context, movie.id)
             } else {
                 PremiereReminderScheduler.cancel(context, movie.id)
             }
@@ -414,7 +417,8 @@ class MovieRepository(
         _reminderMovieIds.value.forEach { movieId ->
             val movie = _movies.value.firstOrNull { it.id == movieId } ?: return@forEach
             if (_notificationsEnabled.value) {
-                PremiereReminderScheduler.schedule(context, movie, current)
+                val scheduled = PremiereReminderScheduler.schedule(context, movie, current)
+                if (!scheduled) PremiereReminderScheduler.cancel(context, movie.id)
             } else {
                 PremiereReminderScheduler.cancel(context, movie.id)
             }
