@@ -1,10 +1,14 @@
 package com.example.data
 
+import com.example.BuildConfig
 import com.example.model.Movie
 import com.example.model.MovieGenre
 import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -564,6 +568,216 @@ object PosterNetworkService {
         discovered
     }
 
+    private data class TmdbWatchProvider(
+        val id: Int,
+        val platform: StreamingPlatform
+    )
+
+    private data class TmdbProviderQuery(
+        val mediaType: String,
+        val providerId: Int,
+        val platform: StreamingPlatform,
+        val page: Int
+    )
+
+    /**
+     * Builds a Poland-region streaming catalogue from TMDB's JustWatch-backed provider data.
+     * Only titles with an actual provider entry for region PL are returned.
+     * Audio/subtitle language is not guaranteed by availability alone.
+     */
+    suspend fun fetchPolishStreamingCatalog(maxPagesPerProvider: Int = 4): List<Movie> =
+        withContext(Dispatchers.IO) {
+            val apiKey = BuildConfig.TMDB_API_KEY.trim()
+            if (apiKey.isBlank()) return@withContext emptyList()
+
+            val movieProviders = runCatching { fetchTmdbWatchProviders("movie", apiKey) }
+                .getOrDefault(emptyList())
+            val tvProviders = runCatching { fetchTmdbWatchProviders("tv", apiKey) }
+                .getOrDefault(emptyList())
+            if (movieProviders.isEmpty() && tvProviders.isEmpty()) return@withContext emptyList()
+
+            val maxPages = maxPagesPerProvider.coerceIn(1, 8)
+            val queries = buildList {
+                movieProviders.forEach { provider ->
+                    for (page in 1..maxPages) add(TmdbProviderQuery("movie", provider.id, provider.platform, page))
+                }
+                tvProviders.forEach { provider ->
+                    for (page in 1..maxPages) add(TmdbProviderQuery("tv", provider.id, provider.platform, page))
+                }
+            }
+
+            coroutineScope {
+                val results = mutableListOf<Movie>()
+                for (batch in queries.chunked(5)) {
+                    val batchResults = batch.map { query ->
+                        async { runCatching { fetchTmdbProviderPage(query, apiKey) }.getOrDefault(emptyList()) }
+                    }.awaitAll()
+                    batchResults.forEach(results::addAll)
+                }
+
+                val merged = LinkedHashMap<String, Movie>()
+                for (movie in results) {
+                    val current = merged[movie.id]
+                    merged[movie.id] = if (current == null) movie
+                    else current.copy(platforms = (current.platforms + movie.platforms).distinct())
+                }
+                merged.values.toList()
+            }
+        }
+
+    private fun fetchTmdbWatchProviders(
+        mediaType: String,
+        apiKey: String
+    ): List<TmdbWatchProvider> {
+        val url = "https://api.themoviedb.org/3/watch/providers/$mediaType?watch_region=PL&language=pl-PL&api_key=${URLEncoder.encode(apiKey, "UTF-8")}"
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header("User-Agent", "KinoStream-Android")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            val body = response.body?.string() ?: return emptyList()
+            val providers = JSONObject(body).optJSONArray("results") ?: return emptyList()
+            val mapped = LinkedHashMap<StreamingPlatform, TmdbWatchProvider>()
+            for (index in 0 until providers.length()) {
+                val item = providers.optJSONObject(index) ?: continue
+                val platform = mapSupportedProvider(item.optString("provider_name")) ?: continue
+                val providerId = item.optInt("provider_id", 0)
+                if (providerId > 0 && platform !in mapped) {
+                    mapped[platform] = TmdbWatchProvider(providerId, platform)
+                }
+            }
+            return mapped.values.toList()
+        }
+    }
+
+    private fun mapSupportedProvider(name: String): StreamingPlatform? {
+        val normalized = name.lowercase().replace("+", "plus").replace(" ", "").replace("-", "")
+        return when {
+            "netflix" in normalized -> StreamingPlatform.NETFLIX
+            "amazonprimevideo" in normalized || normalized == "primevideo" -> StreamingPlatform.PRIME_VIDEO
+            "hbomax" in normalized || normalized == "max" -> StreamingPlatform.MAX
+            "disneyplus" in normalized -> StreamingPlatform.DISNEY_PLUS
+            "skyshowtime" in normalized -> StreamingPlatform.SKYSHOWTIME
+            else -> null
+        }
+    }
+
+    private fun fetchTmdbProviderPage(
+        query: TmdbProviderQuery,
+        apiKey: String
+    ): List<Movie> {
+        val path = if (query.mediaType == "tv") "tv" else "movie"
+        val url = "https://api.themoviedb.org/3/discover/$path" +
+            "?api_key=${URLEncoder.encode(apiKey, "UTF-8")}" +
+            "&language=pl-PL&region=PL&watch_region=PL" +
+            "&with_watch_providers=${query.providerId}" +
+            "&with_watch_monetization_types=flatrate%2Cfree%2Cads" +
+            "&include_adult=false&sort_by=popularity.desc&page=${query.page}"
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header("User-Agent", "KinoStream-Android")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            val body = response.body?.string() ?: return emptyList()
+            val items = JSONObject(body).optJSONArray("results") ?: return emptyList()
+            val output = mutableListOf<Movie>()
+            val isSeries = query.mediaType == "tv"
+
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val tmdbId = item.optInt("id", 0)
+                if (tmdbId <= 0) continue
+
+                val titleField = if (isSeries) "name" else "title"
+                val originalTitleField = if (isSeries) "original_name" else "original_title"
+                val dateField = if (isSeries) "first_air_date" else "release_date"
+                val localizedTitle = item.optString(titleField).trim()
+                val originalTitle = item.optString(originalTitleField).trim().ifBlank { localizedTitle }
+                if (localizedTitle.isBlank() || originalTitle.isBlank()) continue
+
+                val posterPath = item.optString("poster_path").takeIf {
+                    it.isNotBlank() && it != "null"
+                }.orEmpty()
+                val posterUrl = if (posterPath.isNotBlank()) "https://image.tmdb.org/t/p/w500$posterPath" else ""
+                val backdropPath = item.optString("backdrop_path").takeIf {
+                    it.isNotBlank() && it != "null"
+                }.orEmpty()
+                val backdropUrl = if (backdropPath.isNotBlank()) "https://image.tmdb.org/t/p/w780$backdropPath" else posterUrl
+                val date = item.optString(dateField)
+                val year = date.take(4).toIntOrNull() ?: 0
+                val genreIds = item.optJSONArray("genre_ids")
+                val genreNames = if (genreIds == null) emptyList() else (0 until genreIds.length()).mapNotNull {
+                    tmdbGenreName(genreIds.optInt(it))
+                }
+                val genre = mapGenre(genreNames.joinToString(" "))
+                val overview = item.optString("overview").trim()
+                val availabilityAttribution = "Dostępność w Polsce: dane JustWatch udostępniane przez TMDB. " +
+                    "Dostępność języka audio i napisów może się różnić w zależności od tytułu."
+                val description = listOf(overview, availabilityAttribution)
+                    .filter { it.isNotBlank() }
+                    .joinToString("\n\n")
+
+                output.add(
+                    Movie(
+                        id = "tmdb-${query.mediaType}-$tmdbId",
+                        title = localizedTitle,
+                        originalTitle = originalTitle,
+                        polishTitle = localizedTitle,
+                        year = year,
+                        genre = genre,
+                        filmwebRating = 0.0,
+                        filmwebVotesCount = 0,
+                        ratingSource = MovieRatingSource.NONE,
+                        platforms = listOf(query.platform),
+                        durationMinutes = if (isSeries) 45 else 100,
+                        director = "Brak danych",
+                        cast = emptyList(),
+                        description = description,
+                        posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
+                        posterEmoji = if (isSeries) "📺" else "🎬",
+                        posterUrl = posterUrl,
+                        backdropUrl = backdropUrl,
+                        isSeries = isSeries,
+                        premiereDate = date.takeIf { it.isNotBlank() },
+                        hasPolishDubbing = true,
+                        ageRating = "Brak danych",
+                        isAvailabilityVerified = true
+                    )
+                )
+            }
+            output
+        }
+    }
+
+    private fun tmdbGenreName(id: Int): String? = when (id) {
+        28, 10759 -> "Action"
+        12 -> "Adventure"
+        16 -> "Animation"
+        35 -> "Comedy"
+        80 -> "Crime"
+        99 -> "Documentary"
+        18, 10766, 10768 -> "Drama"
+        10751 -> "Family"
+        14 -> "Fantasy"
+        36 -> "History"
+        27 -> "Horror"
+        10402 -> "Music"
+        9648 -> "Mystery"
+        10749 -> "Romance"
+        878, 10765 -> "Science Fiction"
+        10770 -> "TV Movie"
+        53 -> "Thriller"
+        10752 -> "War"
+        37 -> "Western"
+        else -> null
+    }
+
     suspend fun searchLiveSeriesAndMovies(query: String): List<Movie> =
         withContext(Dispatchers.IO) {
             if (query.trim().length < 2) return@withContext emptyList()
@@ -619,7 +833,7 @@ object PosterNetworkService {
 
                 val networkName = show.optJSONObject("webChannel")?.optString("name", "")
                     ?: show.optJSONObject("network")?.optString("name", "") ?: ""
-                val platforms = mapPlatforms(networkName, rawName)
+                val platforms = emptyList<StreamingPlatform>()
 
                 list.add(
                     Movie(
@@ -691,7 +905,7 @@ object PosterNetworkService {
 
                 // iTunes search results do not contain Filmweb scores or verified VOD availability.
                 val rating = 0.0
-                val platforms = mapPlatforms("", rawTrackName)
+                val platforms = emptyList<StreamingPlatform>()
 
                 list.add(
                     Movie(
@@ -743,15 +957,5 @@ object PosterNetworkService {
         }
     }
 
-    private fun mapPlatforms(network: String, title: String): List<StreamingPlatform> {
-        val lower = network.lowercase()
-        return when {
-            lower.contains("netflix") -> listOf(StreamingPlatform.NETFLIX)
-            lower.contains("prime") || lower.contains("amazon") -> listOf(StreamingPlatform.PRIME_VIDEO)
-            lower.contains("hbo") || lower.contains("max") -> listOf(StreamingPlatform.MAX)
-            lower.contains("disney+") || lower == "disney" -> listOf(StreamingPlatform.DISNEY_PLUS)
-            lower.contains("skyshowtime") -> listOf(StreamingPlatform.SKYSHOWTIME)
-            else -> emptyList()
-        }
-    }
+
 }
