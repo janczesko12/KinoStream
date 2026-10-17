@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.MovieRatingSource
 import com.example.ui.theme.FilmwebRed
 import com.example.ui.theme.FilmwebYellow
 import java.util.Locale
@@ -38,34 +39,37 @@ fun FilmwebRatingBadge(
     minRating: Double = 6.5,
     maxRating: Double = 10.0,
     showLabel: Boolean = true,
-    compact: Boolean = false
+    compact: Boolean = false,
+    ratingSource: MovieRatingSource = MovieRatingSource.FILMWEB
 ) {
-    val isGoodRating = rating in minRating..maxRating
-    val formattedRating = String.format(Locale.US, "%.1f", rating)
+    val hasRating = rating > 0.0 && ratingSource != MovieRatingSource.NONE
+    val isFilmwebRating = ratingSource == MovieRatingSource.FILMWEB
+    val isGoodRating = hasRating && (!isFilmwebRating || rating in minRating..maxRating)
+    val formattedRating = if (hasRating) String.format(Locale.US, "%.1f", rating) else "Brak oceny"
 
     // Strictly RED text when rating is below minRating (or outside range)
-    val textColor = if (isGoodRating) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        FilmwebRed
+    val textColor = when {
+        !hasRating -> MaterialTheme.colorScheme.onSurfaceVariant
+        isGoodRating -> MaterialTheme.colorScheme.onSurface
+        else -> FilmwebRed
     }
 
-    val iconColor = if (isGoodRating) {
-        FilmwebYellow
-    } else {
-        FilmwebRed
+    val iconColor = when {
+        !hasRating -> MaterialTheme.colorScheme.onSurfaceVariant
+        isGoodRating -> FilmwebYellow
+        else -> FilmwebRed
     }
 
-    val badgeBg = if (isGoodRating) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-    } else {
-        FilmwebRed.copy(alpha = 0.12f)
+    val badgeBg = when {
+        !hasRating -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        isGoodRating -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+        else -> FilmwebRed.copy(alpha = 0.12f)
     }
 
-    val borderColor = if (isGoodRating) {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-    } else {
-        FilmwebRed.copy(alpha = 0.5f)
+    val borderColor = when {
+        !hasRating -> MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+        isGoodRating -> MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+        else -> FilmwebRed.copy(alpha = 0.5f)
     }
 
     Box(
@@ -82,8 +86,8 @@ fun FilmwebRatingBadge(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
-                imageVector = if (isGoodRating) Icons.Filled.Star else Icons.Filled.Warning,
-                contentDescription = "Ocena Filmweb",
+                imageVector = if (!hasRating || isGoodRating) Icons.Filled.Star else Icons.Filled.Warning,
+                contentDescription = if (hasRating) "Ocena ${ratingSource.displayName}" else "Brak oceny",
                 tint = iconColor,
                 modifier = Modifier.size(if (compact) 14.dp else 16.dp)
             )
@@ -97,7 +101,7 @@ fun FilmwebRatingBadge(
 
             if (showLabel && !compact) {
                 Text(
-                    text = "Filmweb",
+                    text = ratingSource.displayName,
                     color = textColor.copy(alpha = if (isGoodRating) 0.7f else 0.9f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
