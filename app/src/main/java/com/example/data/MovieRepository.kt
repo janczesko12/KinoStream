@@ -88,19 +88,16 @@ class MovieRepository(
     val usePolishTitles: StateFlow<Boolean> = _usePolishTitles.asStateFlow()
 
     private fun loadCatalogWithCachedPosters(): List<Movie> {
-        val catalog = MovieCatalog.sampleMovies
-            .filter { it.hasPolishDubbing }
+        val staticCatalog = MovieCatalog.sampleMovies
+            .filter { it.hasPolishDubbing && it.platforms.isNotEmpty() }
             .map { movie ->
                 val cachedPlTitle = prefs.getString("pl_title_${movie.id}", null)
-                val resolvedPlTitle = if (!cachedPlTitle.isNullOrBlank()) {
-                    cachedPlTitle
-                } else {
-                    PosterNetworkService.localizeTitleToPolish(
+                val resolvedPlTitle = cachedPlTitle?.takeIf { it.isNotBlank() }
+                    ?: PosterNetworkService.localizeTitleToPolish(
                         rawTitle = movie.originalTitle,
                         isSeries = movie.isSeries,
                         catalogPolishFallback = movie.polishTitle
                     )
-                }
                 val cachedPoster = prefs.getString("poster_url_${movie.id}", null)
                 movie.copy(
                     title = resolvedPlTitle,
@@ -109,10 +106,46 @@ class MovieRepository(
                     backdropUrl = if (movie.backdropUrl.isNotBlank()) movie.backdropUrl else (cachedPoster ?: "")
                 )
             }
-        val knownIds = catalog.mapTo(mutableSetOf()) { it.id }
-        val persistedDiscoveries = loadDiscoveredMovies()
-            .filter { it.hasPolishDubbing && knownIds.add(it.id) }
-        return catalog + persistedDiscoveries
+
+        val cachedProviderCatalog = loadDiscoveredMovies()
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
+                (it.id.startsWith("tmdb-movie-") || it.id.startsWith("tmdb-tv-")) }
+
+        // After a provider refresh, cached TMDB/JustWatch data is the source of truth.
+        // Curated records are retained (including their Filmweb scores) only if a provider match exists.
+        if (prefs.getLong("popular_catalog_v2_last_sync", 0L) > 0L && cachedProviderCatalog.isNotEmpty()) {
+            val matchedProviderIds = mutableSetOf<String>()
+            val verifiedStatic = staticCatalog.mapNotNull { local ->
+                val providerMatch = cachedProviderCatalog.firstOrNull { sameProviderTitle(local, it) }
+                    ?: return@mapNotNull null
+                matchedProviderIds.add(providerMatch.id)
+                local.copy(
+                    platforms = providerMatch.platforms,
+                    isAvailabilityVerified = true
+                )
+            }
+            val newProviderItems = cachedProviderCatalog.filter { it.id !in matchedProviderIds }
+            return (verifiedStatic + newProviderItems).distinctBy { it.id }
+        }
+
+        // Before the first successful provider sync, preserve the curated offline catalogue.
+        val legacyCached = loadDiscoveredMovies()
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
+        val knownIds = staticCatalog.mapTo(mutableSetOf()) { it.id }
+        return staticCatalog + legacyCached.filter { knownIds.add(it.id) }
+    }
+
+    private fun normalizedProviderTitle(movie: Movie): String =
+        (movie.originalTitle.ifBlank { movie.title })
+            .lowercase()
+            .replace(Regex("[^\\p{L}\\p{N}]"), "")
+
+    private fun sameProviderTitle(first: Movie, second: Movie): Boolean {
+        if (first.isSeries != second.isSeries) return false
+        val firstTitle = normalizedProviderTitle(first)
+        val secondTitle = normalizedProviderTitle(second)
+        if (firstTitle.isBlank() || firstTitle != secondTitle) return false
+        return first.year == 0 || second.year == 0 || kotlin.math.abs(first.year - second.year) <= 1
     }
 
     /**
@@ -240,69 +273,53 @@ class MovieRepository(
      */
     suspend fun discoverMoreMovies(force: Boolean = false): Int = coroutineScope {
         val now = System.currentTimeMillis()
-        // Versioned key forces one full catalogue import after this larger discovery update.
         val lastSync = prefs.getLong("popular_catalog_v2_last_sync", 0L)
         val refreshInterval = 7L * 24L * 60L * 60L * 1000L
         if (!force && now - lastSync < refreshInterval) return@coroutineScope 0
 
-        // TVMaze pages contain up to 250 series each. Four pages can add a large catalogue
-        // on first launch; search terms then broaden the movie catalogue through Apple iTunes.
-        val results = mutableListOf<Movie>()
-        runCatching { PosterNetworkService.discoverTvMazeCatalogPages(maxPages = 4) }
-            .getOrDefault(emptyList())
-            .let { results.addAll(it) }
+        // Only this source returns provider-specific availability for Poland.
+        val verifiedResults = runCatching {
+            PosterNetworkService.fetchPolishStreamingCatalog(maxPagesPerProvider = 4)
+        }.getOrDefault(emptyList())
+            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() && it.hasPolishDubbing }
 
-        val searchTerms = listOf(
-            "popular movies", "best movies", "action movies", "comedy movies",
-            "science fiction", "horror movies", "animation movies", "romantic movies",
-            "thriller movies", "family movies", "adventure movies", "fantasy movies",
-            "crime movies", "war movies", "classic movies", "Oscar winners",
-            "Marvel", "Star Wars", "Batman", "Spider-Man", "Pixar", "Studio Ghibli",
-            "Harry Potter", "James Bond", "Fast and Furious", "Mission Impossible",
-            "Lord of the Rings", "Jurassic Park", "Dune", "2024 movies", "2025 movies",
-            "2026 movies", "Netflix series", "HBO series", "medical drama", "crime drama",
-            "sitcoms", "Korean drama", "anime"
-        )
+        // An empty response usually means the API key/network is missing; keep existing catalogue and retry later.
+        if (verifiedResults.isEmpty()) return@coroutineScope 0
 
-        // Requests are grouped to keep concurrency moderate on mobile networks.
-        for (batch in searchTerms.chunked(6)) {
-            val batchResults = batch.map { term ->
-                async {
-                    runCatching { PosterNetworkService.searchLiveSeriesAndMovies(term) }
-                        .getOrDefault(emptyList())
-                }
-            }.awaitAll()
-            batchResults.forEach { results.addAll(it) }
+        val existingStatic = _movies.value.filterNot(::isOnlineDiscovery)
+        val matchedProviderIds = mutableSetOf<String>()
+        val verifiedStatic = existingStatic.mapNotNull { local ->
+            val matching = verifiedResults.firstOrNull { sameProviderTitle(local, it) }
+                ?: return@mapNotNull null
+            matchedProviderIds.add(matching.id)
+            val platformNames = matching.platforms.joinToString(", ") { it.displayName }
+            local.copy(
+                platforms = matching.platforms,
+                isAvailabilityVerified = true,
+                description = listOf(
+                    local.description,
+                    "Dostępność VOD w Polsce: $platformNames. Dane JustWatch udostępniane przez TMDB; wersja audio i napisy mogą się różnić."
+                ).filter { it.isNotBlank() }.distinct().joinToString("\n\n")
+            )
         }
 
-        val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
-        val existingIds = current.mapTo(mutableSetOf()) { it.id }
-        val existingTitles = current.mapTo(mutableSetOf()) {
-            it.originalTitle.trim().lowercase()
-        }
-        var added = 0
-        for (movie in results) {
-            if (!movie.hasPolishDubbing) continue
-            val normalizedTitle = movie.originalTitle.trim().lowercase()
-            if (movie.id.isNotBlank() && normalizedTitle.isNotBlank() &&
-                movie.id !in existingIds && normalizedTitle !in existingTitles
-            ) {
-                current.add(movie)
-                existingIds.add(movie.id)
-                existingTitles.add(normalizedTitle)
-                added++
-            }
-        }
+        val newlyDiscovered = verifiedResults.filter { it.id !in matchedProviderIds }
+        val merged = (verifiedStatic + newlyDiscovered)
+            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() && it.hasPolishDubbing }
+            .distinctBy { it.id }
 
-        if (added > 0) {
-            _movies.value = current
-            persistDiscoveredMovies(current.filter(::isOnlineDiscovery))
-        }
-        // Retry at next launch after a total outage; don't mark an empty attempt as synced.
-        if (results.isNotEmpty()) {
+        if (merged.isNotEmpty()) {
+            val beforeIds = _movies.value.mapTo(mutableSetOf()) { it.id }
+            val addedCount = newlyDiscovered.count { it.id !in beforeIds }
+            _movies.value = merged
+            // Persist provider records (not speculative TVMaze/iTunes searches); the loader overlays
+            // their current platform list onto curated records on subsequent launches.
+            persistDiscoveredMovies(verifiedResults)
             prefs.edit().putLong("popular_catalog_v2_last_sync", now).apply()
+            addedCount
+        } else {
+            0
         }
-        added
     }
 
     /**
@@ -312,7 +329,7 @@ class MovieRepository(
     suspend fun searchAndMergeOnline(query: String) {
         if (query.trim().length < 2) return
         val onlineResults = PosterNetworkService.searchLiveSeriesAndMovies(query)
-            .filter { it.hasPolishDubbing }
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
         if (onlineResults.isEmpty()) return
 
         val existing = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
@@ -512,7 +529,7 @@ class MovieRepository(
     data class ReminderToggleResult(val enabled: Boolean, val scheduled: Boolean)
 
     private fun isOnlineDiscovery(movie: Movie): Boolean =
-        movie.id.startsWith("tvmaze-") || movie.id.startsWith("itunes-") || movie.id.startsWith("auto-tvmaze-")
+        movie.id.startsWith("tvmaze-") || movie.id.startsWith("itunes-") || movie.id.startsWith("auto-tvmaze-") || movie.id.startsWith("tmdb-movie-") || movie.id.startsWith("tmdb-tv-")
 
     private fun loadDiscoveredMovies(): List<Movie> {
         return try {
