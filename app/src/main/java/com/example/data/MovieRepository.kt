@@ -240,35 +240,37 @@ class MovieRepository(
      */
     suspend fun discoverMoreMovies(force: Boolean = false): Int = coroutineScope {
         val now = System.currentTimeMillis()
-        val lastSync = prefs.getLong("popular_catalog_last_sync", 0L)
+        // Versioned key forces one full catalogue import after this larger discovery update.
+        val lastSync = prefs.getLong("popular_catalog_v2_last_sync", 0L)
         val refreshInterval = 7L * 24L * 60L * 60L * 1000L
         if (!force && now - lastSync < refreshInterval) return@coroutineScope 0
 
+        // TVMaze pages contain up to 250 series each. Four pages can add a large catalogue
+        // on first launch; search terms then broaden the movie catalogue through Apple iTunes.
+        val results = mutableListOf<Movie>()
+        runCatching { PosterNetworkService.discoverTvMazeCatalogPages(maxPages = 4) }
+            .getOrDefault(emptyList())
+            .let { results.addAll(it) }
+
         val searchTerms = listOf(
-            "popular movies",
-            "best movies",
-            "action movies",
-            "comedy movies",
-            "science fiction",
-            "horror movies",
-            "animation movies",
-            "romantic movies",
-            "thriller movies",
-            "Marvel",
-            "Star Wars",
-            "Batman",
-            "Spider-Man",
-            "Pixar",
-            "Oscar",
-            "Netflix"
+            "popular movies", "best movies", "action movies", "comedy movies",
+            "science fiction", "horror movies", "animation movies", "romantic movies",
+            "thriller movies", "family movies", "adventure movies", "fantasy movies",
+            "crime movies", "war movies", "classic movies", "Oscar winners",
+            "Marvel", "Star Wars", "Batman", "Spider-Man", "Pixar", "Studio Ghibli",
+            "Harry Potter", "James Bond", "Fast and Furious", "Mission Impossible",
+            "Lord of the Rings", "Jurassic Park", "Dune", "2024 movies", "2025 movies",
+            "2026 movies", "Netflix series", "HBO series", "medical drama", "crime drama",
+            "sitcoms", "Korean drama", "anime"
         )
 
-        // Keep network load modest; the existing search service handles API failures per source.
-        val batches = searchTerms.chunked(4)
-        val results = mutableListOf<Movie>()
-        for (batch in batches) {
+        // Requests are grouped to keep concurrency moderate on mobile networks.
+        for (batch in searchTerms.chunked(6)) {
             val batchResults = batch.map { term ->
-                async { runCatching { PosterNetworkService.searchLiveSeriesAndMovies(term) }.getOrDefault(emptyList()) }
+                async {
+                    runCatching { PosterNetworkService.searchLiveSeriesAndMovies(term) }
+                        .getOrDefault(emptyList())
+                }
             }.awaitAll()
             batchResults.forEach { results.addAll(it) }
         }
@@ -282,10 +284,12 @@ class MovieRepository(
         for (movie in results) {
             if (!movie.hasPolishDubbing) continue
             val normalizedTitle = movie.originalTitle.trim().lowercase()
-            if (movie.id.isNotBlank() && existingIds.add(movie.id) &&
-                normalizedTitle.isNotBlank() && existingTitles.add(normalizedTitle)
+            if (movie.id.isNotBlank() && normalizedTitle.isNotBlank() &&
+                movie.id !in existingIds && normalizedTitle !in existingTitles
             ) {
                 current.add(movie)
+                existingIds.add(movie.id)
+                existingTitles.add(normalizedTitle)
                 added++
             }
         }
@@ -294,8 +298,10 @@ class MovieRepository(
             _movies.value = current
             persistDiscoveredMovies(current.filter(::isOnlineDiscovery))
         }
-        // Save only after all sources were attempted, so temporary outages can be retried next launch.
-        prefs.edit().putLong("popular_catalog_last_sync", now).apply()
+        // Retry at next launch after a total outage; don't mark an empty attempt as synced.
+        if (results.isNotEmpty()) {
+            prefs.edit().putLong("popular_catalog_v2_last_sync", now).apply()
+        }
         added
     }
 
@@ -564,7 +570,7 @@ class MovieRepository(
 
     private fun persistDiscoveredMovies(movies: List<Movie>) {
         val output = JSONArray()
-        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(250).forEach { movie ->
+        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(2000).forEach { movie ->
             val platforms = JSONArray().apply { movie.platforms.forEach { put(it.name) } }
             val cast = JSONArray().apply { movie.cast.forEach { put(it) } }
             val colors = JSONArray().apply { movie.posterGradientColors.forEach { put(it) } }
