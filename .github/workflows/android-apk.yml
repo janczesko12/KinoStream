@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: kinostream-${{ github.ref }}
@@ -31,7 +31,7 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      # A temporary debug key is only for CI testing. Debug APKs are never published as releases.
+      # CI debug APK is only a build/test artifact; production signing stays in Google AI Studio/Play Console.
       - name: Generate temporary debug keystore
         run: keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
@@ -48,48 +48,3 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
-
-      # Configure these repository Actions secrets before publishing installable updates:
-      # SIGNING_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD.
-      # The keystore must have the "upload" alias configured in app/build.gradle.kts.
-      - name: Prepare stable release signing key
-        id: signing
-        env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        shell: bash
-        run: |
-          if [[ -z "$SIGNING_KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_PASSWORD" ]]; then
-            echo "release_ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Signed release skipped. Configure SIGNING_KEYSTORE_BASE64, STORE_PASSWORD and KEY_PASSWORD in repository Actions secrets."
-            exit 0
-          fi
-          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/release.keystore"
-          test -s "$GITHUB_WORKSPACE/release.keystore"
-          echo "release_ready=true" >> "$GITHUB_OUTPUT"
-          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
-
-      - name: Build signed release APK
-        if: steps.signing.outputs.release_ready == 'true'
-        env:
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease
-
-      - name: Publish stable signed APK
-        if: steps.signing.outputs.release_ready == 'true' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          cp app/build/outputs/apk/release/app-release.apk ./KinoStream.apk
-          if gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload latest ./KinoStream.apk --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create latest ./KinoStream.apk \\
-              --repo "$GITHUB_REPOSITORY" \\
-              --title "KinoStream — najnowsza wersja" \\
-              --notes "Podpisane wydanie produkcyjne. Zbudowane z gałęzi main." \\
-              --latest
-          fi
