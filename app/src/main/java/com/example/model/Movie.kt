@@ -35,6 +35,12 @@ enum class MovieGenre(val displayName: String) {
     PRZYGODOWY("Przygodowy")
 }
 
+enum class MovieRatingSource(val displayName: String) {
+    FILMWEB("Filmweb"),
+    TVMAZE("TVMaze"),
+    NONE("Brak oceny")
+}
+
 enum class ContentTypeFilter(val label: String) {
     ALL("Wszystkie"),
     MOVIES("Filmy"),
@@ -67,13 +73,19 @@ data class Movie(
     val hasPolishDubbing: Boolean = true,
     val ageRating: String = "16+",
     val polishTitle: String = title,
-    val profileLogoUrl: String = posterUrl.ifBlank { backdropUrl }
+    val profileLogoUrl: String = posterUrl.ifBlank { backdropUrl },
+    val ratingSource: MovieRatingSource = MovieRatingSource.FILMWEB,
+    // False means streaming availability and Polish-language options have not been verified.
+    val isAvailabilityVerified: Boolean = true
 ) {
+    val hasRating: Boolean
+        get() = filmwebRating > 0.0 && ratingSource != MovieRatingSource.NONE
+
     val isRecommendedOnFilmweb: Boolean
-        get() = filmwebRating >= 6.5
+        get() = ratingSource == MovieRatingSource.FILMWEB && filmwebRating >= 6.5
 
     fun isWithinRatingRange(minRating: Double, maxRating: Double): Boolean =
-        filmwebRating in minRating..maxRating
+        ratingSource == MovieRatingSource.FILMWEB && filmwebRating in minRating..maxRating
 
     fun displayTitle(usePolishTitles: Boolean = true): String =
         if (usePolishTitles) polishTitle.ifBlank { title } else originalTitle.ifBlank { title }
