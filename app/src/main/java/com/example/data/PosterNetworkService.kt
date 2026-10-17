@@ -441,7 +441,7 @@ object PosterNetworkService {
 
                 val webChannel = show.optJSONObject("webChannel")?.optString("name", "")
                     ?: show.optJSONObject("network")?.optString("name", "") ?: ""
-                val platforms = mapPlatforms(webChannel, rawName)
+                val platforms = emptyList<StreamingPlatform>()
                 val airdate = ep.optString("airdate", "Nowość")
                 val year = airdate.take(4).toIntOrNull() ?: 2025
 
@@ -545,7 +545,7 @@ object PosterNetworkService {
                                 filmwebVotesCount = 0,
                                 ratingSource = if (rating > 0.0) MovieRatingSource.TVMAZE else MovieRatingSource.NONE,
                                 isAvailabilityVerified = false,
-                                platforms = mapPlatforms(networkName, rawName),
+                                platforms = emptyList<StreamingPlatform>(),
                                 durationMinutes = runtime,
                                 director = "Brak danych",
                                 cast = emptyList(),
