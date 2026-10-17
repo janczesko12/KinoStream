@@ -67,7 +67,7 @@ fun AppUpdateSection(modifier: Modifier = Modifier) {
             message = if (update != null) {
                 "Dostępna jest nowa wersja KinoStream."
             } else {
-                "Masz najnowszą wersję (\${BuildConfig.VERSION_NAME})."
+                "Masz najnowszą wersję (${BuildConfig.VERSION_NAME})."
             }
         } catch (exception: Exception) {
             update = null
@@ -107,7 +107,7 @@ fun AppUpdateSection(modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Wersja zainstalowana: \${BuildConfig.VERSION_NAME}",
+                        text = "Wersja zainstalowana: ${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -136,7 +136,7 @@ fun AppUpdateSection(modifier: Modifier = Modifier) {
             update?.let { latest ->
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Nowa wersja: \${latest.versionName} (kod \${latest.versionCode})",
+                    text = "Nowa wersja: ${latest.versionName} (kod ${latest.versionCode})",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
