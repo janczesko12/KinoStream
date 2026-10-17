@@ -178,7 +178,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 movie.director.contains(params.query, ignoreCase = true) ||
                 movie.cast.any { it.contains(params.query, ignoreCase = true) }
 
-            val matchesPlatform = params.platform == null || movie.platforms.contains(params.platform)
+            val matchesPlatform = params.platform == null ||
+                (movie.isAvailabilityVerified && movie.platforms.contains(params.platform))
             val matchesGenre = params.genre == MovieGenre.WSZYSTKIE || movie.genre == params.genre
             val matchesRating = !params.highRatingOnly ||
                 (movie.ratingSource == MovieRatingSource.FILMWEB &&
@@ -213,8 +214,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectedPlatform,
         usePolishTitles
     ) { movies, platform, usePolish ->
-        movies.filter { it.hasPolishDubbing && (it.isPremiere || it.isUpcoming || it.isAutoSynced) }
-            .filter { platform == null || it.platforms.contains(platform) }
+        movies.filter {
+            it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
+                (it.isPremiere || it.isUpcoming || it.isAutoSynced)
+        }.filter { platform == null || it.platforms.contains(platform) }
             .map { it.withLanguage(usePolish) }
             .sortedByDescending { it.year }
     }.flowOn(Dispatchers.Default)
