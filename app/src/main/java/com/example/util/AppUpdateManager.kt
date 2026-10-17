@@ -31,10 +31,19 @@ object AppUpdateManager {
     private const val EXPECTED_APK_PREFIX =
         "https://github.com/janczesko12/KinoStream/releases/download/latest/"
 
-    private val client = OkHttpClient.Builder()
+    // Keep metadata requests short so a slow release API does not block the Settings screen.
+    private val metadataClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .callTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .build()
+
+    // APKs can take several minutes on a weak mobile connection. The old global 120-second
+    // call timeout aborted otherwise valid downloads; this client allows a longer transfer.
+    private val apkDownloadClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.MINUTES)
         .build()
 
     suspend fun fetchLatestUpdate(): AppUpdateInfo = withContext(Dispatchers.IO) {
@@ -83,7 +92,7 @@ object AppUpdateManager {
             .header("User-Agent", "KinoStream-Android")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        metadataClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Serwer aktualizacji odpowiedział kodem ${response.code}.")
             }
@@ -98,28 +107,58 @@ object AppUpdateManager {
         update: AppUpdateInfo,
         onProgress: (Int) -> Unit
     ): File = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(update.apkUrl)
-            .header("User-Agent", "KinoStream-Android")
-            .build()
-
         val directory = File(context.cacheDir, "updates")
         if (!directory.exists() && !directory.mkdirs()) {
             throw IOException("Nie można utworzyć katalogu pobierania.")
         }
-        val temporaryFile = File(directory, "kinostream-update.apk.part")
+        // Keep a separate partial file per release, so retrying can safely resume the same APK.
+        val temporaryFile = File(directory, "kinostream-update-${update.versionCode}.apk.part")
         val apkFile = File(directory, "kinostream-update.apk")
+        val existingBytes = if (temporaryFile.isFile) temporaryFile.length() else 0L
+        val requestBuilder = Request.Builder()
+            .url(update.apkUrl)
+            .header("User-Agent", "KinoStream-Android")
+        if (existingBytes > 0L) {
+            requestBuilder.header("Range", "bytes=${existingBytes}-")
+        }
+        val request = requestBuilder.build()
 
         try {
-            client.newCall(request).execute().use { response ->
+            apkDownloadClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw IOException("Pobieranie APK nie powiodło się (HTTP ${response.code}).")
                 }
                 val body = response.body ?: throw IOException("Brak pliku APK w odpowiedzi.")
-                val totalBytes = body.contentLength()
+                val isPartialResponse = response.code == 206
+                val rangeStart = response.header("Content-Range")
+                    ?.substringAfter("bytes ")
+                    ?.substringBefore("-")
+                    ?.toLongOrNull()
+                if (existingBytes > 0L && isPartialResponse && rangeStart != existingBytes) {
+                    temporaryFile.delete()
+                    throw IOException("Serwer zwrócił nieprawidłowy fragment APK. Kliknij „Pobierz” ponownie.")
+                }
+                val resumeDownload = existingBytes > 0L && isPartialResponse
+                val initialBytes = if (resumeDownload) existingBytes else 0L
+                val responseLength = body.contentLength()
+                val totalBytes = if (responseLength >= 0L) responseLength + initialBytes else -1L
                 val digest = MessageDigest.getInstance("SHA-256")
-                var downloadedBytes = 0L
+                if (resumeDownload) {
+                    temporaryFile.inputStream().buffered().use { previous ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = previous.read(buffer)
+                            if (read < 0) break
+                            digest.update(buffer, 0, read)
+                        }
+                    }
+                }
+                var downloadedBytes = initialBytes
                 var lastReportedProgress = -1
+                if (totalBytes > 0L && initialBytes > 0L) {
+                    lastReportedProgress = ((initialBytes * 100) / totalBytes).toInt().coerceIn(0, 99)
+                    withContext(Dispatchers.Main) { onProgress(lastReportedProgress) }
+                }
 
                 body.byteStream().use { input ->
                     temporaryFile.outputStream().buffered().use { output ->
@@ -132,7 +171,7 @@ object AppUpdateManager {
                             downloadedBytes += read
                             if (totalBytes > 0L) {
                                 val progress = ((downloadedBytes * 100) / totalBytes)
-                                    .toInt().coerceIn(0, 100)
+                                    .toInt().coerceIn(0, 99)
                                 if (progress != lastReportedProgress) {
                                     lastReportedProgress = progress
                                     withContext(Dispatchers.Main) { onProgress(progress) }
@@ -145,6 +184,7 @@ object AppUpdateManager {
                 if (downloadedBytes == 0L) throw IOException("Pobrany plik APK jest pusty.")
                 val actualChecksum = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
                 if (!actualChecksum.equals(update.sha256, ignoreCase = true)) {
+                    temporaryFile.delete()
                     throw IOException("Weryfikacja APK nie powiodła się. Plik został odrzucony.")
                 }
             }
@@ -158,7 +198,8 @@ object AppUpdateManager {
             withContext(Dispatchers.Main) { onProgress(100) }
             apkFile
         } catch (exception: Exception) {
-            temporaryFile.delete()
+            // Do not delete the partial file on a timeout/network failure: the next attempt
+            // requests the remaining bytes from GitHub instead of making the user start over.
             throw exception
         }
     }
