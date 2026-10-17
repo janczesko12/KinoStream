@@ -16,8 +16,9 @@ android {
     applicationId = "com.aistudio.kinostream.rvpx"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.1"
+    // CI injects monotonically increasing website-release versions; local builds keep these defaults.
+    versionCode = providers.environmentVariable("KINOSTREAM_VERSION_CODE").orNull?.toIntOrNull() ?: 2
+    versionName = providers.environmentVariable("KINOSTREAM_VERSION_NAME").orNull ?: "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
