@@ -13,6 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import com.example.ui.theme.ThemeMode
 import com.example.util.NotificationHelper
+import com.example.util.PremiereReminderScheduler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
