@@ -282,14 +282,21 @@ class MovieRepository(
         val verifiedResults = runCatching {
             PosterNetworkService.fetchPolishStreamingCatalog(maxPagesPerProvider = 4)
         }.getOrDefault(emptyList())
-            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() && it.hasPolishDubbing }
+            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() }
 
-        // An empty response usually means the API key/network is missing; keep existing catalogue and retry later.
-        if (verifiedResults.isEmpty()) return@coroutineScope 0
+        // An empty provider response must not leave a blank screen forever; keep cached verified
+        // titles and do not advance the sync timestamp, so the next app launch can retry.
+        if (verifiedResults.isEmpty()) {
+            val cached = loadDiscoveredMovies()
+                .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
+                    (it.id.startsWith("tmdb-movie-") || it.id.startsWith("tmdb-tv-")) }
+            if (cached.isNotEmpty()) _movies.value = cached
+            return@coroutineScope 0
+        }
 
         // Start with the curated catalogue too, even on first launch when only cached
         // verified provider entries are allowed into the visible StateFlow.
-        val existingStatic = MovieCatalog.sampleMovies.filter { it.hasPolishDubbing }
+        val existingStatic = MovieCatalog.sampleMovies
         val matchedProviderIds = mutableSetOf<String>()
         val verifiedStatic = existingStatic.mapNotNull { local ->
             val matching = verifiedResults.firstOrNull { sameProviderTitle(local, it) }
@@ -308,7 +315,7 @@ class MovieRepository(
 
         val newlyDiscovered = verifiedResults.filter { it.id !in matchedProviderIds }
         val merged = (verifiedStatic + newlyDiscovered)
-            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() && it.hasPolishDubbing }
+            .filter { it.isAvailabilityVerified && it.platforms.isNotEmpty() }
             .distinctBy { it.id }
 
         if (merged.isNotEmpty()) {
