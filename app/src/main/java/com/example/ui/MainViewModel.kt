@@ -191,11 +191,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (params.sort) {
                     MovieSortOption.FILMWEB_RATING_DESC -> list.sortedWith(
                         compareBy<Movie> { it.ratingSource != MovieRatingSource.FILMWEB }
-                            .thenByDescending { it.filmwebRating }
+                            .thenByDescending { it.filmwebRating.takeIf { score -> it.ratingSource == MovieRatingSource.FILMWEB } ?: 0.0 }
                     )
                     MovieSortOption.FILMWEB_RATING_ASC -> list.sortedWith(
                         compareBy<Movie> { it.ratingSource != MovieRatingSource.FILMWEB }
-                            .thenBy { it.filmwebRating }
+                            .thenBy { it.filmwebRating.takeIf { score -> it.ratingSource == MovieRatingSource.FILMWEB } ?: 0.0 }
                     )
                     MovieSortOption.YEAR_DESC -> list.sortedByDescending { it.year }
                     MovieSortOption.TITLE_ASC -> list.sortedBy { it.title }
