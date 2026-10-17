@@ -85,7 +85,7 @@ object AppUpdateManager {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("Serwer aktualizacji odpowiedział kodem \${response.code}.")
+                throw IOException("Serwer aktualizacji odpowiedział kodem ${response.code}.")
             }
             val body = response.body?.string()
                 ?: throw IOException("Serwer zwrócił pustą odpowiedź.")
@@ -113,7 +113,7 @@ object AppUpdateManager {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw IOException("Pobieranie APK nie powiodło się (HTTP \${response.code}).")
+                    throw IOException("Pobieranie APK nie powiodło się (HTTP ${response.code}).")
                 }
                 val body = response.body ?: throw IOException("Brak pliku APK w odpowiedzi.")
                 val totalBytes = body.contentLength()
@@ -172,7 +172,7 @@ object AppUpdateManager {
         ) {
             val settingsIntent = Intent(
                 Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:\${context.packageName}")
+                Uri.parse("package:${context.packageName}")
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(settingsIntent)
             return false
@@ -180,7 +180,7 @@ object AppUpdateManager {
 
         val apkUri = FileProvider.getUriForFile(
             context,
-            "\${context.packageName}.fileprovider",
+            "${context.packageName}.fileprovider",
             apkFile
         )
         val installIntent = Intent(Intent.ACTION_VIEW).apply {
