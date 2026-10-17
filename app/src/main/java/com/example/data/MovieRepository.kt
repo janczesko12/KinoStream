@@ -234,6 +234,72 @@ class MovieRepository(
     }
 
     /**
+     * Expands the initial catalogue from public TVMaze and Apple iTunes search indexes.
+     * Runs at most once every 7 days, merges/deduplicates results and persists discoveries.
+     * Search results are metadata only: platform availability and Filmweb ratings are not invented.
+     */
+    suspend fun discoverMoreMovies(force: Boolean = false): Int = coroutineScope {
+        val now = System.currentTimeMillis()
+        val lastSync = prefs.getLong("popular_catalog_last_sync", 0L)
+        val refreshInterval = 7L * 24L * 60L * 60L * 1000L
+        if (!force && now - lastSync < refreshInterval) return@coroutineScope 0
+
+        val searchTerms = listOf(
+            "popular movies",
+            "best movies",
+            "action movies",
+            "comedy movies",
+            "science fiction",
+            "horror movies",
+            "animation movies",
+            "romantic movies",
+            "thriller movies",
+            "Marvel",
+            "Star Wars",
+            "Batman",
+            "Spider-Man",
+            "Pixar",
+            "Oscar",
+            "Netflix"
+        )
+
+        // Keep network load modest; the existing search service handles API failures per source.
+        val batches = searchTerms.chunked(4)
+        val results = mutableListOf<Movie>()
+        for (batch in batches) {
+            val batchResults = batch.map { term ->
+                async { runCatching { PosterNetworkService.searchLiveSeriesAndMovies(term) }.getOrDefault(emptyList()) }
+            }.awaitAll()
+            batchResults.forEach { results.addAll(it) }
+        }
+
+        val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
+        val existingIds = current.mapTo(mutableSetOf()) { it.id }
+        val existingTitles = current.mapTo(mutableSetOf()) {
+            it.originalTitle.trim().lowercase()
+        }
+        var added = 0
+        for (movie in results) {
+            if (!movie.hasPolishDubbing) continue
+            val normalizedTitle = movie.originalTitle.trim().lowercase()
+            if (movie.id.isNotBlank() && existingIds.add(movie.id) &&
+                normalizedTitle.isNotBlank() && existingTitles.add(normalizedTitle)
+            ) {
+                current.add(movie)
+                added++
+            }
+        }
+
+        if (added > 0) {
+            _movies.value = current
+            persistDiscoveredMovies(current.filter(::isOnlineDiscovery))
+        }
+        // Save only after all sources were attempted, so temporary outages can be retried next launch.
+        prefs.edit().putLong("popular_catalog_last_sync", now).apply()
+        added
+    }
+
+    /**
      * Searches online APIs (TVMaze & Apple iTunes) for additional real movies & series with Polish dubbing,
      * merging new results into the catalog so favorites/watched toggles also work on them.
      */
