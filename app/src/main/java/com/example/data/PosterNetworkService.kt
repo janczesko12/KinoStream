@@ -612,7 +612,6 @@ object PosterNetworkService {
                 val year = releaseDate.take(4).toIntOrNull() ?: 2024
                 val genreName = track.optString("primaryGenreName", "")
                 val durationMillis = track.optLong("trackTimeMillis", 7200000L)
-                val durationMillis = track.optLong("trackTimeMillis", 7200000L)
                 val durationMinutes = (durationMillis / 60000L).toInt().coerceIn(75, 220)
 
                 // iTunes search results do not contain Filmweb scores or verified VOD availability.
