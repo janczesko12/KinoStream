@@ -170,12 +170,15 @@ fun MovieCard(
                         Box(
                             modifier = Modifier
                                 .clip(TagShape)
-                                .background(FilmwebGreen.copy(alpha = 0.14f))
+                                .background(
+                                    if (movie.isAvailabilityVerified) FilmwebGreen.copy(alpha = 0.14f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
                                 .padding(horizontal = 5.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "PL Dubbing",
-                                color = FilmwebGreen,
+                                text = if (movie.isAvailabilityVerified) "PL Dubbing" else "Dostępność PL niepotwierdzona",
+                                color = if (movie.isAvailabilityVerified) FilmwebGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -199,11 +202,12 @@ fun MovieCard(
                         rating = movie.filmwebRating,
                         minRating = minFilmwebRating,
                         maxRating = maxFilmwebRating,
-                        compact = true
+                        compact = true,
+                        ratingSource = movie.ratingSource
                     )
 
                     PlatformBadgesRow(
-                        platforms = movie.platforms,
+                        platforms = if (movie.isAvailabilityVerified) movie.platforms else emptyList(),
                         compact = true
                     )
                 }

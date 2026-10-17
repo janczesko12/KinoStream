@@ -418,6 +418,7 @@ fun PremieresScreen(
                                         rating = movie.filmwebRating,
                                         minRating = minFilmwebRating,
                                         maxRating = maxFilmwebRating,
+                                        ratingSource = movie.ratingSource,
                                         compact = true
                                     )
 

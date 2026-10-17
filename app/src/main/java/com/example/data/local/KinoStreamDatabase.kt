@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [WatchlistEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class KinoStreamDatabase : RoomDatabase() {
     abstract fun watchlistDao(): WatchlistDao
@@ -24,7 +24,6 @@ abstract class KinoStreamDatabase : RoomDatabase() {
                     KinoStreamDatabase::class.java,
                     "kinostream_watchlist.db"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

@@ -8,6 +8,7 @@ import com.example.data.MovieRepository
 import com.example.model.ContentTypeFilter
 import com.example.model.Movie
 import com.example.model.MovieGenre
+import com.example.model.MovieRatingSource
 import com.example.model.MovieSortOption
 import com.example.model.StreamingPlatform
 import com.example.ui.theme.ThemeMode
@@ -177,17 +178,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 movie.director.contains(params.query, ignoreCase = true) ||
                 movie.cast.any { it.contains(params.query, ignoreCase = true) }
 
-            val matchesPlatform = params.platform == null || movie.platforms.contains(params.platform)
+            val matchesPlatform = params.platform == null ||
+                (movie.isAvailabilityVerified && movie.platforms.contains(params.platform))
             val matchesGenre = params.genre == MovieGenre.WSZYSTKIE || movie.genre == params.genre
             val matchesRating = !params.highRatingOnly ||
-                (movie.filmwebRating in params.minRating..params.maxRating)
+                (movie.ratingSource == MovieRatingSource.FILMWEB &&
+                    movie.filmwebRating in params.minRating..params.maxRating)
 
             matchesType && matchesQuery && matchesPlatform && matchesGenre && matchesRating
         }.map { it.withLanguage(usePolish) }
             .let { list ->
                 when (params.sort) {
-                    MovieSortOption.FILMWEB_RATING_DESC -> list.sortedByDescending { it.filmwebRating }
-                    MovieSortOption.FILMWEB_RATING_ASC -> list.sortedBy { it.filmwebRating }
+                    MovieSortOption.FILMWEB_RATING_DESC -> list.sortedWith(
+                        compareBy<Movie> { it.ratingSource != MovieRatingSource.FILMWEB }
+                            .thenByDescending { movie -> movie.filmwebRating.takeIf { movie.ratingSource == MovieRatingSource.FILMWEB } ?: 0.0 }
+                    )
+                    MovieSortOption.FILMWEB_RATING_ASC -> list.sortedWith(
+                        compareBy<Movie> { it.ratingSource != MovieRatingSource.FILMWEB }
+                            .thenBy { movie -> movie.filmwebRating.takeIf { movie.ratingSource == MovieRatingSource.FILMWEB } ?: 0.0 }
+                    )
                     MovieSortOption.YEAR_DESC -> list.sortedByDescending { it.year }
                     MovieSortOption.TITLE_ASC -> list.sortedBy { it.title }
                     MovieSortOption.GENRE_ASC -> list.sortedBy { it.genre.displayName }
@@ -205,8 +214,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectedPlatform,
         usePolishTitles
     ) { movies, platform, usePolish ->
-        movies.filter { it.hasPolishDubbing && (it.isPremiere || it.isUpcoming || it.isAutoSynced) }
-            .filter { platform == null || it.platforms.contains(platform) }
+        movies.filter {
+            it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
+                (it.isPremiere || it.isUpcoming || it.isAutoSynced)
+        }.filter { platform == null || it.platforms.contains(platform) }
             .map { it.withLanguage(usePolish) }
             .sortedByDescending { it.year }
     }.flowOn(Dispatchers.Default)
@@ -244,8 +255,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         watchlistIds
     ) { movies, favs, watched, watchlist ->
         val watchedMovies = movies.filter { watched.contains(it.id) }
-        val avgRating = if (watchedMovies.isNotEmpty()) {
-            watchedMovies.map { it.filmwebRating }.average()
+        val ratedWatchedMovies = watchedMovies.filter {
+            it.ratingSource == MovieRatingSource.FILMWEB && it.filmwebRating > 0.0
+        }
+        val avgRating = if (ratedWatchedMovies.isNotEmpty()) {
+            ratedWatchedMovies.map { it.filmwebRating }.average()
         } else 0.0
         val totalMinutes = watchedMovies.sumOf { it.durationMinutes }
 
@@ -334,9 +348,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val count = repository.syncLatestPlatformReleases(sendNotification = true)
             _isSyncingNewReleases.value = false
             _snackbarMessage.value = if (count > 0) {
-                "Automatycznie pobrano i dodano $count nowych premier VOD! 🎬"
+                "Automatycznie dodano $count premier ze zweryfikowaną dostępnością VOD. 🎬"
             } else {
-                "Katalog premier z Netflix, Prime Video, Max, Disney+ i SkyShowtime jest aktualny ✔️"
+                "Nie znaleziono premier z potwierdzoną dostępnością w polskim VOD. Nie dodano niezweryfikowanych pozycji."
             }
         }
     }
@@ -374,11 +388,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleReminder(movie: Movie) {
-        val isReminded = repository.toggleReminder(movie.id)
-        _snackbarMessage.value = if (isReminded) {
-            "Włączono przypomnienie o premierze 🔔"
-        } else {
-            "Wyłączono przypomnienie"
+        val result = repository.toggleReminder(movie.id)
+        _snackbarMessage.value = when {
+            !result.enabled -> "Wyłączono przypomnienie"
+            result.scheduled -> "Zaplanowano powiadomienie na potwierdzoną datę premiery 🔔"
+            else -> "Zapisano przypomnienie, ale brak zweryfikowanej przyszłej daty lub włączonej platformy. Nie wysłano fałszywego powiadomienia."
         }
     }
 

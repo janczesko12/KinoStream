@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.Movie
+import com.example.model.MovieRatingSource
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
 import com.example.ui.theme.FilmwebRed
@@ -84,7 +85,8 @@ fun MovieDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val isWithinRange = movie.filmwebRating in minFilmwebRating..maxFilmwebRating
+    val hasFilmwebRating = movie.ratingSource == MovieRatingSource.FILMWEB && movie.filmwebRating > 0.0
+    val isWithinRange = hasFilmwebRating && movie.filmwebRating in minFilmwebRating..maxFilmwebRating
     val rangeLabel = if (maxFilmwebRating >= 10.0) {
         String.format(Locale.US, "≥ %.1f", minFilmwebRating)
     } else {
@@ -193,7 +195,10 @@ fun MovieDetailSheet(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            PlatformBadgesRow(platforms = movie.platforms, compact = false)
+                            PlatformBadgesRow(
+                                platforms = if (movie.isAvailabilityVerified) movie.platforms else emptyList(),
+                                compact = false
+                            )
 
                             Box(
                                 modifier = Modifier
@@ -241,7 +246,7 @@ fun MovieDetailSheet(
                         } else ""
 
                         Text(
-                            text = "${altLabel}Polski dubbing 🇵🇱 • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
+                            text = "${altLabel}${if (movie.isAvailabilityVerified) "Polski dubbing 🇵🇱" else "Dostępność PL niepotwierdzona"} • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -353,7 +358,7 @@ fun MovieDetailSheet(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isReminded) "Przypomnienie włączone (${movie.premiereDate})" else "Powiadom o premierze (${movie.premiereDate ?: "Wkrótce"})",
+                            text = if (isReminded) "Przypomnienie włączone (${movie.premiereDate ?: "data niepotwierdzona"})" else "Powiadom o premierze (${movie.premiereDate ?: "data niepotwierdzona"})",
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -365,10 +370,10 @@ fun MovieDetailSheet(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isWithinRange) {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        } else {
-                            FilmwebRed.copy(alpha = 0.10f)
+                        containerColor = when {
+                            !hasFilmwebRating -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            isWithinRange -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            else -> FilmwebRed.copy(alpha = 0.10f)
                         }
                     ),
                     shape = RoundedCornerShape(14.dp),
@@ -376,6 +381,8 @@ fun MovieDetailSheet(
                         brush = Brush.horizontalGradient(
                             if (isWithinRange) {
                                 listOf(RoyalBlue.copy(alpha = 0.4f), AccentCyan.copy(alpha = 0.4f))
+                            } else if (!hasFilmwebRating) {
+                                listOf(MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                             } else {
                                 listOf(FilmwebRed.copy(alpha = 0.6f), FilmwebRed.copy(alpha = 0.3f))
                             }
@@ -397,24 +404,36 @@ fun MovieDetailSheet(
                                 Icon(
                                     imageVector = Icons.Filled.Star,
                                     contentDescription = null,
-                                    tint = if (isWithinRange) FilmwebYellow else FilmwebRed,
+                                    tint = when {
+                                        !movie.hasRating -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        movie.ratingSource != MovieRatingSource.FILMWEB || isWithinRange -> FilmwebYellow
+                                        else -> FilmwebRed
+                                    },
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
-                                    text = String.format(Locale.US, "%.1f", movie.filmwebRating),
-                                    fontSize = 28.sp,
+                                    text = if (movie.hasRating) String.format(Locale.US, "%.1f", movie.filmwebRating) else "Brak oceny",
+                                    fontSize = if (movie.hasRating) 28.sp else 18.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (isWithinRange) MaterialTheme.colorScheme.onSurface else FilmwebRed
+                                    color = if (!movie.hasRating) MaterialTheme.colorScheme.onSurfaceVariant
+                                    else if (isWithinRange || movie.ratingSource != MovieRatingSource.FILMWEB) MaterialTheme.colorScheme.onSurface
+                                    else FilmwebRed
                                 )
-                                Text(
-                                    text = "/ 10",
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                if (movie.hasRating) {
+                                    Text(
+                                        text = "/ 10",
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
 
                             Text(
-                                text = "Ocena Filmweb (${NumberFormat.getNumberInstance(Locale.GERMANY).format(movie.filmwebVotesCount)} głosów)",
+                                text = when {
+                                    !movie.hasRating -> "Brak potwierdzonej oceny"
+                                    movie.ratingSource == MovieRatingSource.FILMWEB -> "Ocena Filmweb (${NumberFormat.getNumberInstance(Locale.GERMANY).format(movie.filmwebVotesCount)} głosów)"
+                                    else -> "Ocena: ${movie.ratingSource.displayName} — nie jest oceną Filmweb"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -425,17 +444,25 @@ fun MovieDetailSheet(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (isWithinRange) {
-                                        FilmwebGreen.copy(alpha = 0.15f)
-                                    } else {
-                                        FilmwebRed.copy(alpha = 0.15f)
+                                    when {
+                                        !hasFilmwebRating -> MaterialTheme.colorScheme.surfaceVariant
+                                        isWithinRange -> FilmwebGreen.copy(alpha = 0.15f)
+                                        else -> FilmwebRed.copy(alpha = 0.15f)
                                     }
                                 )
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (isWithinRange) "W przedziale ($rangeLabel)" else "Poza zakresem ($rangeLabel)",
-                                color = if (isWithinRange) FilmwebGreen else FilmwebRed,
+                                text = when {
+                                    !hasFilmwebRating -> "Brak oceny Filmweb"
+                                    isWithinRange -> "W przedziale ($rangeLabel)"
+                                    else -> "Poza zakresem ($rangeLabel)"
+                                },
+                                color = when {
+                                    !hasFilmwebRating -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    isWithinRange -> FilmwebGreen
+                                    else -> FilmwebRed
+                                },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )

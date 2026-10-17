@@ -6,9 +6,14 @@ import com.example.data.local.KinoStreamDatabase
 import com.example.data.local.WatchlistDao
 import com.example.data.local.WatchlistEntity
 import com.example.model.Movie
+import com.example.model.MovieGenre
+import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
+import org.json.JSONArray
+import org.json.JSONObject
 import com.example.ui.theme.ThemeMode
 import com.example.util.NotificationHelper
+import com.example.util.PremiereReminderScheduler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -83,7 +88,7 @@ class MovieRepository(
     val usePolishTitles: StateFlow<Boolean> = _usePolishTitles.asStateFlow()
 
     private fun loadCatalogWithCachedPosters(): List<Movie> {
-        return MovieCatalog.sampleMovies
+        val catalog = MovieCatalog.sampleMovies
             .filter { it.hasPolishDubbing }
             .map { movie ->
                 val cachedPlTitle = prefs.getString("pl_title_${movie.id}", null)
@@ -104,13 +109,17 @@ class MovieRepository(
                     backdropUrl = if (movie.backdropUrl.isNotBlank()) movie.backdropUrl else (cachedPoster ?: "")
                 )
             }
+        val knownIds = catalog.mapTo(mutableSetOf()) { it.id }
+        val persistedDiscoveries = loadDiscoveredMovies()
+            .filter { it.hasPolishDubbing && knownIds.add(it.id) }
+        return catalog + persistedDiscoveries
     }
 
     /**
      * Pulls official Polish streaming titles from Polish VOD metadata for catalog items.
      */
     suspend fun syncPolishStreamingTitles() = coroutineScope {
-        val currentList = _movies.value.filter { it.hasPolishDubbing }
+        val currentList = _movies.value.filter { it.hasPolishDubbing && !isOnlineDiscovery(it) }
         var anyUpdated = false
         val updatedList = currentList.map { movie ->
             async {
@@ -137,7 +146,9 @@ class MovieRepository(
         }.awaitAll()
 
         if (anyUpdated) {
-            _movies.value = updatedList.filter { it.hasPolishDubbing }
+            val discoveries = _movies.value.filter(::isOnlineDiscovery)
+            _movies.value = updatedList.filter { it.hasPolishDubbing } + discoveries
+            persistDiscoveredMovies(discoveries)
         }
     }
 
@@ -180,19 +191,19 @@ class MovieRepository(
      */
     suspend fun syncLatestPlatformReleases(sendNotification: Boolean = false): Int {
         val discovered = PosterNetworkService.fetchLatestPlatformReleases()
-            .filter { it.hasPolishDubbing }
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
         if (discovered.isEmpty()) return 0
 
         val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
-        val existingIds = current.map { it.id }.toSet()
-        val existingTitles = current.map { it.title.lowercase() }.toSet()
+        val existingIds = current.mapTo(mutableSetOf()) { it.id }
+        val existingTitles = current.mapTo(mutableSetOf()) { it.title.trim().lowercase() }
 
         var addedCount = 0
         var firstAdded: Movie? = null
 
         for (item in discovered) {
             if (!item.hasPolishDubbing) continue
-            if (!existingIds.contains(item.id) && !existingTitles.contains(item.title.lowercase())) {
+            if (existingIds.add(item.id) && existingTitles.add(item.title.trim().lowercase())) {
                 current.add(0, item)
                 addedCount++
                 if (firstAdded == null) {
@@ -203,15 +214,19 @@ class MovieRepository(
 
         if (addedCount > 0) {
             _movies.value = current.filter { it.hasPolishDubbing }
+            persistDiscoveredMovies(_movies.value.filter(::isOnlineDiscovery))
             _autoSyncedCount.value = _autoSyncedCount.value + addedCount
 
-            if (sendNotification && _notificationsEnabled.value && firstAdded != null) {
+            if (sendNotification && _notificationsEnabled.value && firstAdded != null &&
+                firstAdded.isAvailabilityVerified &&
+                firstAdded.platforms.any { it in _enabledNotificationPlatforms.value }
+            ) {
                 NotificationHelper.sendPremiereNotification(
                     context = context,
                     title = firstAdded.displayTitle(_usePolishTitles.value),
                     message = "Automatycznie dodano $addedCount nowości z polskim dubbingiem do katalogu!",
                     platformName = firstAdded.platforms.joinToString(", ") { it.displayName },
-                    filmwebRating = firstAdded.filmwebRating
+                    filmwebRating = firstAdded.filmwebRating.takeIf { firstAdded.hasRating } ?: 0.0
                 )
             }
         }
@@ -229,19 +244,22 @@ class MovieRepository(
         if (onlineResults.isEmpty()) return
 
         val existing = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
-        val existingIds = existing.map { it.id }.toSet()
-        val existingTitles = existing.map { it.title.lowercase() }.toSet()
+        val existingIds = existing.mapTo(mutableSetOf()) { it.id }
+        val existingTitles = existing.mapTo(mutableSetOf()) { it.title.trim().lowercase() }
 
         var changed = false
         for (item in onlineResults) {
             if (!item.hasPolishDubbing) continue
-            if (!existingIds.contains(item.id) && !existingTitles.contains(item.title.lowercase())) {
+            if (item.id !in existingIds && item.title.trim().lowercase() !in existingTitles) {
                 existing.add(item)
+                existingIds.add(item.id)
+                existingTitles.add(item.title.trim().lowercase())
                 changed = true
             }
         }
         if (changed) {
             _movies.value = existing.filter { it.hasPolishDubbing }
+            persistDiscoveredMovies(_movies.value.filter(::isOnlineDiscovery))
         }
     }
 
@@ -339,7 +357,7 @@ class MovieRepository(
         watchlistDao.deleteByMovieId(movieId)
     }
 
-    fun toggleReminder(movieId: String): Boolean {
+    fun toggleReminder(movieId: String): ReminderToggleResult {
         val current = _reminderMovieIds.value.toMutableSet()
         val isNowReminded = if (current.contains(movieId)) {
             current.remove(movieId)
@@ -351,19 +369,20 @@ class MovieRepository(
         _reminderMovieIds.value = current
         saveStringSet("reminder_movie_ids", current)
 
-        if (isNowReminded && _notificationsEnabled.value) {
-            val movie = _movies.value.find { it.id == movieId }
-            if (movie != null) {
-                NotificationHelper.sendPremiereNotification(
-                    context = context,
-                    title = movie.title,
-                    message = "Zapisano przypomnienie o premierze (${movie.premiereDate ?: "Wkrótce"})!",
-                    platformName = movie.platforms.joinToString(", ") { it.displayName },
-                    filmwebRating = movie.filmwebRating
-                )
-            }
+        val movie = _movies.value.find { it.id == movieId }
+        if (!isNowReminded) {
+            movie?.let { PremiereReminderScheduler.cancel(context, it.id) }
+            return ReminderToggleResult(enabled = false, scheduled = false)
         }
-        return isNowReminded
+
+        val scheduled = if (_notificationsEnabled.value && movie != null) {
+            PremiereReminderScheduler.schedule(
+                context = context,
+                movie = movie,
+                enabledPlatforms = _enabledNotificationPlatforms.value
+            )
+        } else false
+        return ReminderToggleResult(enabled = true, scheduled = scheduled)
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -374,6 +393,15 @@ class MovieRepository(
     fun setNotificationsEnabled(enabled: Boolean) {
         _notificationsEnabled.value = enabled
         prefs.edit().putBoolean("notifications_enabled", enabled).apply()
+        _reminderMovieIds.value.forEach { movieId ->
+            val movie = _movies.value.firstOrNull { it.id == movieId } ?: return@forEach
+            if (enabled) {
+                val scheduled = PremiereReminderScheduler.schedule(context, movie, _enabledNotificationPlatforms.value)
+                if (!scheduled) PremiereReminderScheduler.cancel(context, movie.id)
+            } else {
+                PremiereReminderScheduler.cancel(context, movie.id)
+            }
+        }
     }
 
     fun togglePlatformNotification(platform: StreamingPlatform) {
@@ -387,6 +415,15 @@ class MovieRepository(
         }
         _enabledNotificationPlatforms.value = current
         prefs.edit().putStringSet("notif_platforms", current.map { it.name }.toSet()).apply()
+        _reminderMovieIds.value.forEach { movieId ->
+            val movie = _movies.value.firstOrNull { it.id == movieId } ?: return@forEach
+            if (_notificationsEnabled.value) {
+                val scheduled = PremiereReminderScheduler.schedule(context, movie, current)
+                if (!scheduled) PremiereReminderScheduler.cancel(context, movie.id)
+            } else {
+                PremiereReminderScheduler.cancel(context, movie.id)
+            }
+        }
     }
 
     fun sendTestPremiereNotification() {
@@ -395,9 +432,107 @@ class MovieRepository(
             context = context,
             title = sampleMovie.title,
             message = "Hit filmowy debiutuje w streamingu! Sprawdź szczegóły w KinoStream.",
-            platformName = sampleMovie.platforms.first().displayName,
-            filmwebRating = sampleMovie.filmwebRating
+            platformName = sampleMovie.platforms.firstOrNull()?.displayName ?: "Niezweryfikowana platforma",
+            filmwebRating = sampleMovie.filmwebRating.takeIf { sampleMovie.hasRating } ?: 0.0
         )
+    }
+
+    data class ReminderToggleResult(val enabled: Boolean, val scheduled: Boolean)
+
+    private fun isOnlineDiscovery(movie: Movie): Boolean =
+        movie.id.startsWith("tvmaze-") || movie.id.startsWith("itunes-") || movie.id.startsWith("auto-tvmaze-")
+
+    private fun loadDiscoveredMovies(): List<Movie> {
+        return try {
+            val json = JSONArray(prefs.getString("discovered_movies_json", "[]"))
+            (0 until json.length()).mapNotNull { index ->
+                val item = json.optJSONObject(index) ?: return@mapNotNull null
+                runCatching {
+                    fun strings(key: String): List<String> {
+                        val array = item.optJSONArray(key) ?: return emptyList()
+                        return (0 until array.length()).map { array.optString(it) }
+                    }
+                    fun longs(key: String): List<Long> {
+                        val array = item.optJSONArray(key) ?: return emptyList()
+                        return (0 until array.length()).map { array.optLong(it) }
+                    }
+                    Movie(
+                        id = item.getString("id"),
+                        title = item.optString("title"),
+                        originalTitle = item.optString("originalTitle"),
+                        year = item.optInt("year", 0),
+                        genre = runCatching { MovieGenre.valueOf(item.optString("genre", "DRAMAT")) }.getOrDefault(MovieGenre.DRAMAT),
+                        filmwebRating = item.optDouble("rating", 0.0),
+                        filmwebVotesCount = item.optInt("votes", 0),
+                        platforms = strings("platforms").mapNotNull { value ->
+                            runCatching { StreamingPlatform.valueOf(value) }.getOrNull()
+                        },
+                        durationMinutes = item.optInt("duration", 0),
+                        director = item.optString("director", "Brak danych"),
+                        cast = strings("cast"),
+                        description = item.optString("description"),
+                        posterGradientColors = longs("posterGradientColors"),
+                        posterEmoji = item.optString("posterEmoji", "🎬"),
+                        posterUrl = item.optString("posterUrl"),
+                        backdropUrl = item.optString("backdropUrl"),
+                        isSeries = item.optBoolean("isSeries", false),
+                        premiereDate = item.opt("premiereDate")?.takeUnless { it == JSONObject.NULL }?.toString(),
+                        isPremiere = item.optBoolean("isPremiere", false),
+                        isUpcoming = item.optBoolean("isUpcoming", false),
+                        isAutoSynced = item.optBoolean("isAutoSynced", false),
+                        hasPolishDubbing = item.optBoolean("hasPolishDubbing", false),
+                        ageRating = item.optString("ageRating", "16+"),
+                        polishTitle = item.optString("polishTitle"),
+                        profileLogoUrl = item.optString("profileLogoUrl"),
+                        ratingSource = runCatching {
+                            MovieRatingSource.valueOf(item.optString("ratingSource", "NONE"))
+                        }.getOrDefault(MovieRatingSource.NONE),
+                        isAvailabilityVerified = item.optBoolean("isAvailabilityVerified", false)
+                    )
+                }.getOrNull()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun persistDiscoveredMovies(movies: List<Movie>) {
+        val output = JSONArray()
+        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(250).forEach { movie ->
+            val platforms = JSONArray().apply { movie.platforms.forEach { put(it.name) } }
+            val cast = JSONArray().apply { movie.cast.forEach { put(it) } }
+            val colors = JSONArray().apply { movie.posterGradientColors.forEach { put(it) } }
+            output.put(JSONObject().apply {
+                put("id", movie.id)
+                put("title", movie.title)
+                put("originalTitle", movie.originalTitle)
+                put("year", movie.year)
+                put("genre", movie.genre.name)
+                put("rating", movie.filmwebRating)
+                put("ratingSource", movie.ratingSource.name)
+                put("votes", movie.filmwebVotesCount)
+                put("platforms", platforms)
+                put("duration", movie.durationMinutes)
+                put("director", movie.director)
+                put("cast", cast)
+                put("description", movie.description)
+                put("posterGradientColors", colors)
+                put("posterEmoji", movie.posterEmoji)
+                put("posterUrl", movie.posterUrl)
+                put("backdropUrl", movie.backdropUrl)
+                put("isSeries", movie.isSeries)
+                put("premiereDate", movie.premiereDate ?: JSONObject.NULL)
+                put("isPremiere", movie.isPremiere)
+                put("isUpcoming", movie.isUpcoming)
+                put("isAutoSynced", movie.isAutoSynced)
+                put("hasPolishDubbing", movie.hasPolishDubbing)
+                put("isAvailabilityVerified", movie.isAvailabilityVerified)
+                put("ageRating", movie.ageRating)
+                put("polishTitle", movie.polishTitle)
+                put("profileLogoUrl", movie.profileLogoUrl)
+            })
+        }
+        prefs.edit().putString("discovered_movies_json", output.toString()).apply()
     }
 
     private fun loadStringSet(key: String): Set<String> {

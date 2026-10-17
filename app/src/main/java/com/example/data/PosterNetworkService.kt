@@ -2,6 +2,7 @@ package com.example.data
 
 import com.example.model.Movie
 import com.example.model.MovieGenre
+import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -398,22 +399,13 @@ object PosterNetworkService {
      * Automatically fetches new releases with Polish dubbing that came out on Netflix,
      * Prime Video, Max, Disney+, and SkyShowtime.
      */
-    suspend fun fetchLatestPlatformReleases(): List<Movie> =
-        withContext(Dispatchers.IO) {
-            val discovered = mutableListOf<Movie>()
-            try {
-                discovered.addAll(fetchTvMazeWebSchedule())
-            } catch (_: Exception) {}
-            try {
-                discovered.addAll(searchItunesMovies("2025", markAsAutoRelease = true, limit = 8))
-            } catch (_: Exception) {}
-            try {
-                discovered.addAll(searchItunesMovies("2024", markAsAutoRelease = true, limit = 8))
-            } catch (_: Exception) {}
-            discovered
-                .filter { it.hasPolishDubbing }
-                .distinctBy { it.title.lowercase() }
-        }
+    /**
+     * TVMaze and Apple iTunes provide metadata, not current Polish VOD availability or dubbing.
+     * Do not classify their results as premieres until a reliable availability source is integrated.
+     */
+    suspend fun fetchLatestPlatformReleases(): List<Movie> = withContext(Dispatchers.IO) {
+        emptyList()
+    }
 
     private fun fetchTvMazeWebSchedule(): List<Movie> {
         val url = "https://api.tvmaze.com/schedule/web"
@@ -451,12 +443,9 @@ object PosterNetworkService {
 
                 val ratingObj = show.optJSONObject("rating")
                 val rawAvg = ratingObj?.optDouble("average", 0.0) ?: 0.0
-                val rating = if (rawAvg.isNaN() || rawAvg <= 0.0) {
-                    val hashMod = abs(rawName.hashCode()) % 26
-                    kotlin.math.round((5.8 + (hashMod / 10.0)) * 10.0) / 10.0
-                } else {
-                    kotlin.math.round(rawAvg * 10.0) / 10.0
-                }
+                val rating = if (rawAvg.isNaN() || rawAvg <= 0.0) 0.0
+                else kotlin.math.round(rawAvg * 10.0) / 10.0
+                val ratingSource = if (rating > 0.0) MovieRatingSource.TVMAZE else MovieRatingSource.NONE
 
                 val genresArr = show.optJSONArray("genres")
                 val firstGenre = if (genresArr != null && genresArr.length() > 0) genresArr.optString(0) else ""
@@ -470,21 +459,23 @@ object PosterNetworkService {
                         year = year,
                         genre = mapGenre(firstGenre),
                         filmwebRating = rating,
-                        filmwebVotesCount = 8500 + (abs(rawName.hashCode()) % 45000),
+                        filmwebVotesCount = 0,
+                        ratingSource = ratingSource,
+                        isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = show.optInt("averageRuntime", 50).takeIf { it > 0 } ?: 50,
-                        director = webChannel.ifBlank { platforms.first().displayName },
-                        cast = listOf("Polska wersja dubbingowa"),
-                        description = "Nowa premiera z polskim dubbingiem automatycznie wykryta w katalogu platformy ${platforms.first().displayName}.",
+                        director = "Brak danych",
+                        cast = emptyList(),
+                        description = "Metadane serialu z TVMaze. Ocena nie pochodzi z Filmweb, a dostępność w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
                         posterEmoji = "🆕",
                         posterUrl = poster,
                         backdropUrl = poster,
                         isSeries = true,
-                        premiereDate = "Auto-dodano: $airdate (${platforms.first().displayName})",
-                        isPremiere = true,
+                        premiereDate = null,
+                        isPremiere = false,
                         isUpcoming = false,
-                        isAutoSynced = true,
+                        isAutoSynced = false,
                         hasPolishDubbing = true,
                         ageRating = "16+"
                     )
@@ -506,7 +497,7 @@ object PosterNetworkService {
                 results.addAll(searchTvMazeShows(query))
             } catch (_: Exception) {}
             try {
-                results.addAll(searchItunesMovies(query, markAsAutoRelease = false, limit = 6))
+                results.addAll(searchItunesMovies(query, limit = 6))
             } catch (_: Exception) {}
             results.filter { it.hasPolishDubbing }
         }
@@ -542,8 +533,10 @@ object PosterNetworkService {
                 val premiered = show.optString("premiered", "2023")
                 val year = premiered.take(4).toIntOrNull() ?: 2023
                 val ratingObj = show.optJSONObject("rating")
-                val rawAvg = ratingObj?.optDouble("average", 7.2) ?: 7.2
-                val rating = if (rawAvg.isNaN() || rawAvg <= 0.0) 7.1 else rawAvg
+                val rawAvg = ratingObj?.optDouble("average", 0.0) ?: 0.0
+                val rating = if (rawAvg.isNaN() || rawAvg <= 0.0) 0.0
+                else kotlin.math.round(rawAvg * 10.0) / 10.0
+                val ratingSource = if (rating > 0.0) MovieRatingSource.TVMAZE else MovieRatingSource.NONE
 
                 val genresArr = show.optJSONArray("genres")
                 val firstGenre = if (genresArr != null && genresArr.length() > 0) genresArr.optString(0) else ""
@@ -561,13 +554,15 @@ object PosterNetworkService {
                         polishTitle = polishName,
                         year = year,
                         genre = mappedGenre,
-                        filmwebRating = kotlin.math.round(rating * 10.0) / 10.0,
-                        filmwebVotesCount = 15400 + (abs(rawName.hashCode()) % 70000),
+                        filmwebRating = rating,
+                        filmwebVotesCount = 0,
+                        ratingSource = ratingSource,
+                        isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = show.optInt("averageRuntime", 50).takeIf { it > 0 } ?: 50,
-                        director = networkName.ifBlank { "Produkcja oryginalna" },
-                        cast = listOf("Polski dubbing"),
-                        description = "Serial dostępny w streamingu z polskim dubbingiem na platformie ${platforms.first().displayName}.",
+                        director = "Brak danych",
+                        cast = emptyList(),
+                        description = "Metadane serialu z TVMaze. Ocena nie pochodzi z Filmweb, a dostępność w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
                         posterEmoji = "📺",
                         posterUrl = poster,
@@ -584,7 +579,6 @@ object PosterNetworkService {
 
     private fun searchItunesMovies(
         query: String,
-        markAsAutoRelease: Boolean = false,
         limit: Int = 6
     ): List<Movie> {
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
@@ -617,12 +611,11 @@ object PosterNetworkService {
                 val releaseDate = track.optString("releaseDate", "2024")
                 val year = releaseDate.take(4).toIntOrNull() ?: 2024
                 val genreName = track.optString("primaryGenreName", "")
-                val director = track.optString("artistName", "Reżyser filmowy")
                 val durationMillis = track.optLong("trackTimeMillis", 7200000L)
                 val durationMinutes = (durationMillis / 60000L).toInt().coerceIn(75, 220)
 
-                val hashMod = abs(rawTrackName.hashCode()) % 30
-                val rating = kotlin.math.round((5.6 + (hashMod / 10.0)) * 10.0) / 10.0
+                // iTunes search results do not contain Filmweb scores or verified VOD availability.
+                val rating = 0.0
                 val platforms = mapPlatforms("", rawTrackName)
 
                 list.add(
@@ -634,20 +627,22 @@ object PosterNetworkService {
                         year = year,
                         genre = mapGenre(genreName),
                         filmwebRating = rating,
-                        filmwebVotesCount = 12000 + (abs(rawTrackName.hashCode()) % 85000),
+                        filmwebVotesCount = 0,
+                        ratingSource = MovieRatingSource.NONE,
+                        isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = durationMinutes,
-                        director = director,
-                        cast = listOf(director, "Polski dubbing"),
-                        description = "Film fabularny z polskim dubbingiem dostępny na platformie ${platforms.first().displayName}.",
+                        director = "Brak danych",
+                        cast = emptyList(),
+                        description = "Metadane i plakat z Apple iTunes. Ocena Filmweb, dostępność VOD w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF1D3557, 0xFF457B9D, 0xFF0D1B2A),
                         posterEmoji = "🎬",
                         posterUrl = highResPoster,
                         backdropUrl = highResPoster,
                         isSeries = false,
-                        premiereDate = if (markAsAutoRelease) "Auto-dodano (${platforms.first().displayName})" else null,
-                        isPremiere = markAsAutoRelease,
-                        isAutoSynced = markAsAutoRelease,
+                        premiereDate = null,
+                        isPremiere = false,
+                        isAutoSynced = false,
                         hasPolishDubbing = true,
                         ageRating = track.optString("contentAdvisoryRating", "12+")
                     )
@@ -679,12 +674,9 @@ object PosterNetworkService {
             lower.contains("netflix") -> listOf(StreamingPlatform.NETFLIX)
             lower.contains("prime") || lower.contains("amazon") -> listOf(StreamingPlatform.PRIME_VIDEO)
             lower.contains("hbo") || lower.contains("max") -> listOf(StreamingPlatform.MAX)
-            lower.contains("disney") || lower.contains("hulu") || lower.contains("abc") -> listOf(StreamingPlatform.DISNEY_PLUS)
-            lower.contains("sky") || lower.contains("paramount") || lower.contains("peacock") || lower.contains("showtime") -> listOf(StreamingPlatform.SKYSHOWTIME)
-            else -> {
-                val all = StreamingPlatform.values()
-                listOf(all[abs(title.hashCode()) % all.size])
-            }
+            lower.contains("disney+") || lower == "disney" -> listOf(StreamingPlatform.DISNEY_PLUS)
+            lower.contains("skyshowtime") -> listOf(StreamingPlatform.SKYSHOWTIME)
+            else -> emptyList()
         }
     }
 }
