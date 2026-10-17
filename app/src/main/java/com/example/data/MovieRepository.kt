@@ -116,7 +116,7 @@ class MovieRepository(
 
         // After a provider refresh, cached TMDB/JustWatch data is the source of truth.
         // Curated records are retained (including their Filmweb scores) only if a provider match exists.
-        if (prefs.getLong("popular_catalog_v2_last_sync", 0L) > 0L && cachedProviderCatalog.isNotEmpty()) {
+        if (prefs.getLong("verified_polish_vod_v3_last_sync", 0L) > 0L && cachedProviderCatalog.isNotEmpty()) {
             val matchedProviderIds = mutableSetOf<String>()
             val verifiedStatic = staticCatalog.mapNotNull { local ->
                 val providerMatch = cachedProviderCatalog.firstOrNull { sameProviderTitle(local, it) }
@@ -274,7 +274,7 @@ class MovieRepository(
      */
     suspend fun discoverMoreMovies(force: Boolean = false): Int = coroutineScope {
         val now = System.currentTimeMillis()
-        val lastSync = prefs.getLong("popular_catalog_v2_last_sync", 0L)
+        val lastSync = prefs.getLong("verified_polish_vod_v3_last_sync", 0L)
         val refreshInterval = 7L * 24L * 60L * 60L * 1000L
         if (!force && now - lastSync < refreshInterval) return@coroutineScope 0
 
@@ -325,7 +325,7 @@ class MovieRepository(
             // Persist provider records (not speculative TVMaze/iTunes searches); the loader overlays
             // their current platform list onto curated records on subsequent launches.
             persistDiscoveredMovies(verifiedResults)
-            prefs.edit().putLong("popular_catalog_v2_last_sync", now).apply()
+            prefs.edit().putLong("verified_polish_vod_v3_last_sync", now).apply()
             addedCount
         } else {
             0
