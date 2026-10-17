@@ -246,7 +246,7 @@ fun MovieDetailSheet(
                         } else ""
 
                         Text(
-                            text = "${altLabel}Polski dubbing 🇵🇱 • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
+                            text = "${altLabel}${if (movie.isAvailabilityVerified) "Polski dubbing 🇵🇱" else "Dostępność PL niepotwierdzona"} • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -358,7 +358,7 @@ fun MovieDetailSheet(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isReminded) "Przypomnienie włączone (${movie.premiereDate})" else "Powiadom o premierze (${movie.premiereDate ?: "Wkrótce"})",
+                            text = if (isReminded) "Przypomnienie włączone (${movie.premiereDate ?: "data niepotwierdzona"})" else "Powiadom o premierze (${movie.premiereDate ?: "data niepotwierdzona"})",
                             fontWeight = FontWeight.SemiBold
                         )
                     }
