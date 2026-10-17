@@ -128,11 +128,9 @@ class MovieRepository(
             return (verifiedStatic + newProviderItems).distinctBy { it.id }
         }
 
-        // Before the first successful provider sync, preserve the curated offline catalogue.
-        val legacyCached = loadDiscoveredMovies()
-            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
-        val knownIds = staticCatalog.mapTo(mutableSetOf()) { it.id }
-        return staticCatalog + legacyCached.filter { knownIds.add(it.id) }
+        // Do not show speculative or outdated platform assignments while the provider API is
+        // unavailable. Only previously verified TMDB/JustWatch entries are safe to display.
+        return cachedProviderCatalog
     }
 
     private fun normalizedProviderTitle(movie: Movie): String =
