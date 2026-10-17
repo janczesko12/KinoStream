@@ -692,7 +692,7 @@ object PosterNetworkService {
         val url = "https://api.themoviedb.org/3/discover/$path" +
             "?language=pl-PL&region=PL&watch_region=PL" +
             "&with_watch_providers=${query.providerId}" +
-            "&with_watch_monetization_types=flatrate%2Cfree%2Cads" +
+            "&with_watch_monetization_types=flatrate%7Cfree%7Cads" +
             "&include_adult=false&sort_by=popularity.desc&page=${query.page}"
         val request = buildTmdbRequest(url, apiKey)
 
