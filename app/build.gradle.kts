@@ -8,6 +8,11 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// TMDB read-only API credential comes from CI secret or a local Gradle property.
+val tmdbApiKey = providers.environmentVariable("TMDB_API_KEY")
+  .orElse(providers.gradleProperty("TMDB_API_KEY"))
+  .getOrElse("")
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -21,6 +26,11 @@ android {
     versionName = providers.environmentVariable("KINOSTREAM_VERSION_NAME").orNull ?: "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    buildConfigField(
+      "String",
+      "TMDB_API_KEY",
+      "\"${tmdbApiKey}\""
+    )
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
