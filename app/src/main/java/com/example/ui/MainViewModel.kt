@@ -111,6 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.syncPolishStreamingTitles()
             repository.enrichCatalogPosters()
+            repository.discoverMoreMovies()
         }
         viewModelScope.launch {
             if (repository.autoAddNewReleasesEnabled.value) {
