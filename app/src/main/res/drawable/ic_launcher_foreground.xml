@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Cinema Clapperboard / Screen with Play Arrow -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Rounded Clapperboard Body -->
+        <path
+            android:fillColor="#0D1B2A"
+            android:pathData="M32,40 C32,36 36,32 40,32 L68,32 C72,32 76,36 76,40 L76,70 C76,74 72,78 68,78 L40,78 C36,78 32,74 32,70 Z" />
+        <!-- Top Clapper Stripe Bar -->
+        <path
+            android:fillColor="#00E5FF"
+            android:pathData="M32,40 C32,36 36,32 40,32 L68,32 C72,32 76,36 76,40 L76,45 L32,45 Z" />
+        <!-- Clapperboard stripes -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M38,32 L44,32 L39,45 L33,45 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M51,32 L57,32 L52,45 L46,45 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M64,32 L70,32 L65,45 L59,45 Z" />
+        <!-- Big Play Button in Center -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M49,50 L63,59 L49,68 Z" />
+        <!-- Glowing Cyan accent dot -->
+        <path
+            android:fillColor="#00E5FF"
+            android:pathData="M68,69 A2.5,2.5 0 1,1 68,74 A2.5,2.5 0 1,1 68,69 Z" />
+    </group>
+</vector>

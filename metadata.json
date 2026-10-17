@@ -1,0 +1,6 @@
+{
+  "name": "KinoStream",
+  "description": "Wyszukiwarka filmów i seriali z 5 platform (Netflix, Prime Video, Max, Disney+, SkyShowtime) z ocenami Filmweb, ulubionymi, statusem obejrzane i powiadomieniami o premierach.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
