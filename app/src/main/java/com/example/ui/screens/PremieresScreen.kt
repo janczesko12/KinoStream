@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.Movie
 import com.example.model.StreamingPlatform
-import com.example.model.MovieRatingSource
 import com.example.ui.components.FilmwebRatingBadge
 import com.example.ui.components.MoviePosterImage
 import com.example.ui.components.PlatformBadgesRow
