@@ -168,7 +168,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         usePolishTitles
     ) { movies, params, usePolish ->
         movies.filter { movie ->
-            if (!movie.hasPolishDubbing) return@filter false
+            if (!movie.isAvailabilityVerified || movie.platforms.isEmpty()) return@filter false
 
             val matchesType = when (params.contentType) {
                 ContentTypeFilter.ALL -> true
@@ -220,7 +220,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         usePolishTitles
     ) { movies, platform, usePolish ->
         movies.filter {
-            it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
+            it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
                 (it.isPremiere || it.isUpcoming || it.isAutoSynced)
         }.filter { platform == null || it.platforms.contains(platform) }
             .map { it.withLanguage(usePolish) }
@@ -243,7 +243,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         usePolishTitles
     ) { movies, (favs, watched, watchlist), filter, usePolish ->
         movies.filter { movie ->
-            movie.hasPolishDubbing && when (filter) {
+            movie.isAvailabilityVerified && movie.platforms.isNotEmpty() && when (filter) {
                 MyListFilter.ALL -> favs.contains(movie.id) || watched.contains(movie.id) || watchlist.contains(movie.id)
                 MyListFilter.WATCHLIST -> watchlist.contains(movie.id)
                 MyListFilter.FAVORITES -> favs.contains(movie.id)
