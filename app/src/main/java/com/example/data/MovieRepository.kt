@@ -411,6 +411,14 @@ class MovieRepository(
         }
         _enabledNotificationPlatforms.value = current
         prefs.edit().putStringSet("notif_platforms", current.map { it.name }.toSet()).apply()
+        _reminderMovieIds.value.forEach { movieId ->
+            val movie = _movies.value.firstOrNull { it.id == movieId } ?: return@forEach
+            if (_notificationsEnabled.value) {
+                PremiereReminderScheduler.schedule(context, movie, current)
+            } else {
+                PremiereReminderScheduler.cancel(context, movie.id)
+            }
+        }
     }
 
     fun sendTestPremiereNotification() {
