@@ -131,13 +131,9 @@ class MovieRepository(
             return (verifiedStatic + newProviderItems).distinctBy { it.id }
         }
 
-        // Before the first successful API sync, show only cached records with verified provider
-        // availability. The network sync will replace this list when it returns valid results.
-        val knownIds = staticCatalog.mapTo(mutableSetOf()) { it.id }
-        val legacyVerified = loadDiscoveredMovies()
-            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
-                !it.id.startsWith("tmdb-movie-") && !it.id.startsWith("tmdb-tv-") }
-        return staticCatalog + legacyVerified.filter { knownIds.add(it.id) } + cachedProviderCatalog
+        // Do not show speculative or outdated platform assignments while the provider API is
+        // unavailable. Only previously verified TMDB/JustWatch entries are safe to display.
+        return cachedProviderCatalog
     }
 
     private fun normalizedProviderTitle(movie: Movie): String =
