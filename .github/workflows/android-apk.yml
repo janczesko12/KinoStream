@@ -29,16 +29,7 @@ jobs:
 
       # A temporary debug key is only for CI testing. Debug APKs are never published as releases.
       - name: Generate temporary debug keystore
-        run: |
-          keytool -genkeypair -v \\
-            -keystore debug.keystore \\
-            -storepass android \\
-            -alias androiddebugkey \\
-            -keypass android \\
-            -keyalg RSA \\
-            -keysize 2048 \\
-            -validity 10000 \\
-            -dname "CN=Android Debug,O=Android,C=US"
+        run: keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build debug APK
         run: gradle assembleDebug
