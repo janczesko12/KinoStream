@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.MainTab
 import com.example.ui.MainViewModel
 import com.example.ui.components.MovieDetailSheet
+import com.example.ui.components.AppUpdatePromptHost
 import com.example.ui.screens.DiscoverScreen
 import com.example.ui.screens.MyListScreen
 import com.example.ui.screens.PremieresScreen
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
             KinoStreamTheme(themeMode = themeMode) {
+                AppUpdatePromptHost()
                 MainAppScreen(viewModel = viewModel)
             }
         }
