@@ -625,16 +625,35 @@ object PosterNetworkService {
             }
         }
 
+    /**
+     * Accepts either a TMDB v3 API key (query parameter) or the v4 API Read Access Token
+     * (Authorization: Bearer header). People often copy the read-access token from TMDB settings.
+     */
+    private fun buildTmdbRequest(url: String, credential: String): Request {
+        val token = credential.trim().removePrefix("Bearer ").trim()
+        val isReadAccessToken = token.count { it == '.' } >= 2
+        val authenticatedUrl = if (isReadAccessToken) {
+            url
+        } else {
+            val separator = if ('?' in url) '&' else '?'
+            "$url${separator}api_key=${URLEncoder.encode(token, "UTF-8")}"
+        }
+        val builder = Request.Builder()
+            .url(authenticatedUrl)
+            .header("Accept", "application/json")
+            .header("User-Agent", "KinoStream-Android")
+        if (isReadAccessToken) {
+            builder.header("Authorization", "Bearer $token")
+        }
+        return builder.build()
+    }
+
     private fun fetchTmdbWatchProviders(
         mediaType: String,
         apiKey: String
     ): List<TmdbWatchProvider> {
-        val url = "https://api.themoviedb.org/3/watch/providers/$mediaType?watch_region=PL&language=pl-PL&api_key=${URLEncoder.encode(apiKey, "UTF-8")}"
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .header("User-Agent", "KinoStream-Android")
-            .build()
+        val url = "https://api.themoviedb.org/3/watch/providers/$mediaType?watch_region=PL&language=pl-PL"
+        val request = buildTmdbRequest(url, apiKey)
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return emptyList()
@@ -671,16 +690,11 @@ object PosterNetworkService {
     ): List<Movie> {
         val path = if (query.mediaType == "tv") "tv" else "movie"
         val url = "https://api.themoviedb.org/3/discover/$path" +
-            "?api_key=${URLEncoder.encode(apiKey, "UTF-8")}" +
-            "&language=pl-PL&region=PL&watch_region=PL" +
+            "?language=pl-PL&region=PL&watch_region=PL" +
             "&with_watch_providers=${query.providerId}" +
             "&with_watch_monetization_types=flatrate%2Cfree%2Cads" +
             "&include_adult=false&sort_by=popularity.desc&page=${query.page}"
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .header("User-Agent", "KinoStream-Android")
-            .build()
+        val request = buildTmdbRequest(url, apiKey)
 
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return emptyList()
