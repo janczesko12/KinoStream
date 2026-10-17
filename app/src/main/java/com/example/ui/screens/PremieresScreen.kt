@@ -52,6 +52,7 @@ import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
 import com.example.ui.components.MoviePosterImage
 import com.example.ui.components.PlatformBadgesRow
+import com.example.ui.components.SupportFooterSection
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
 import com.example.ui.theme.RoyalBlue
@@ -430,6 +431,13 @@ fun PremieresScreen(
                     }
                 }
             }
+        }
+
+        // Support Footer at bottom
+        item {
+            SupportFooterSection(
+                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+            )
         }
     }
 }

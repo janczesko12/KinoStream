@@ -79,12 +79,14 @@ fun MainAppScreen(viewModel: MainViewModel) {
     val savedMovies by viewModel.savedMovies.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val watchedIds by viewModel.watchedIds.collectAsStateWithLifecycle()
+    val watchlistIds by viewModel.watchlistIds.collectAsStateWithLifecycle()
     val reminderIds by viewModel.reminderIds.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val selectedMovie by viewModel.selectedMovie.collectAsStateWithLifecycle()
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedPlatform by viewModel.selectedPlatform.collectAsStateWithLifecycle()
+    val contentTypeFilter by viewModel.contentTypeFilter.collectAsStateWithLifecycle()
     val selectedGenre by viewModel.selectedGenre.collectAsStateWithLifecycle()
     val onlyHighRating by viewModel.onlyHighRating.collectAsStateWithLifecycle()
     val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
@@ -97,6 +99,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
     val autoAddNewReleasesEnabled by viewModel.autoAddNewReleasesEnabled.collectAsStateWithLifecycle()
     val autoSyncedCount by viewModel.autoSyncedCount.collectAsStateWithLifecycle()
     val isSyncingNewReleases by viewModel.isSyncingNewReleases.collectAsStateWithLifecycle()
+    val usePolishTitles by viewModel.usePolishTitles.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -201,7 +204,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                     icon = {
                         BadgedBox(
                             badge = {
-                                val totalSaved = favoriteIds.size + watchedIds.size
+                                val totalSaved = (favoriteIds + watchedIds + watchlistIds).size
                                 if (totalSaved > 0) {
                                     Badge(
                                         containerColor = RoyalBlue,
@@ -281,14 +284,19 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         minFilmwebRating = minFilmwebRating,
                         maxFilmwebRating = maxFilmwebRating,
                         autoSyncedCount = autoSyncedCount,
+                        usePolishTitles = usePolishTitles,
+                        contentTypeFilter = contentTypeFilter,
                         onSearchQueryChange = viewModel::setSearchQuery,
                         onPlatformSelect = viewModel::setPlatform,
+                        onContentTypeSelect = viewModel::setContentTypeFilter,
                         onGenreSelect = viewModel::setGenre,
                         onToggleHighRating = viewModel::toggleHighRatingOnly,
                         onSortOptionSelect = viewModel::setSortOption,
                         onMovieClick = viewModel::selectMovie,
                         onToggleFavorite = viewModel::toggleFavorite,
-                        onToggleWatched = viewModel::toggleWatched
+                        onToggleWatched = viewModel::toggleWatched,
+                        watchlistIds = watchlistIds,
+                        onToggleWatchlist = viewModel::toggleWatchlist
                     )
                 }
 
@@ -318,6 +326,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         movies = savedMovies,
                         favoriteIds = favoriteIds,
                         watchedIds = watchedIds,
+                        watchlistIds = watchlistIds,
                         currentFilter = myListFilter,
                         stats = stats,
                         minFilmwebRating = minFilmwebRating,
@@ -325,7 +334,8 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onFilterChange = viewModel::setMyListFilter,
                         onMovieClick = viewModel::selectMovie,
                         onToggleFavorite = viewModel::toggleFavorite,
-                        onToggleWatched = viewModel::toggleWatched
+                        onToggleWatched = viewModel::toggleWatched,
+                        onToggleWatchlist = viewModel::toggleWatchlist
                     )
                 }
 
@@ -339,13 +349,15 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         autoAddNewReleasesEnabled = autoAddNewReleasesEnabled,
                         autoSyncedCount = autoSyncedCount,
                         isSyncingNewReleases = isSyncingNewReleases,
+                        usePolishTitles = usePolishTitles,
                         onThemeModeChange = viewModel::setThemeMode,
                         onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
                         onToggleNotificationPlatform = viewModel::toggleNotificationPlatform,
                         onSendTestNotification = viewModel::sendTestNotification,
                         onFilmwebRatingRangeChange = viewModel::setFilmwebRatingRange,
                         onAutoAddNewReleasesChange = viewModel::setAutoAddNewReleasesEnabled,
-                        onSyncNewReleasesNow = viewModel::syncNewReleasesNow
+                        onSyncNewReleasesNow = viewModel::syncNewReleasesNow,
+                        onUsePolishTitlesChange = viewModel::setUsePolishTitles
                     )
                 }
             }
@@ -359,12 +371,15 @@ fun MainAppScreen(viewModel: MainViewModel) {
             isFavorite = favoriteIds.contains(movie.id),
             isWatched = watchedIds.contains(movie.id),
             isReminded = reminderIds.contains(movie.id),
+            isInWatchlist = watchlistIds.contains(movie.id),
             minFilmwebRating = minFilmwebRating,
             maxFilmwebRating = maxFilmwebRating,
+            usePolishTitles = usePolishTitles,
             onDismiss = { viewModel.selectMovie(null) },
             onToggleFavorite = { viewModel.toggleFavorite(movie) },
             onToggleWatched = { viewModel.toggleWatched(movie) },
-            onToggleReminder = { viewModel.toggleReminder(movie) }
+            onToggleReminder = { viewModel.toggleReminder(movie) },
+            onToggleWatchlist = { viewModel.toggleWatchlist(movie) }
         )
     }
 }

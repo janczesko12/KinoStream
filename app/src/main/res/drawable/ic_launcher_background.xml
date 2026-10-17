@@ -5,22 +5,55 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Deep dark navy-black background matching uploaded KinoStream logo -->
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="0"
+                android:startX="54"
                 android:startY="0"
-                android:endX="108"
+                android:endX="54"
                 android:endY="108"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#0B132B" />
-                <item android:offset="0.5" android:color="#0D2560" />
-                <item android:offset="1.0" android:color="#1A73E8" />
+                <item android:offset="0.0" android:color="#FF040A18" />
+                <item android:offset="0.5" android:color="#FF07132C" />
+                <item android:offset="1.0" android:color="#FF020610" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Subtle circular glow in center -->
-    <path
-        android:fillColor="#15FFFFFF"
-        android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
+
+    <!-- Radial electric-blue center glow -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="44"
+                android:gradientRadius="46"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#4400A8FF" />
+                <item android:offset="0.6" android:color="#180066CC" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Diagonal background film-strip ribbon -->
+    <group
+        android:pivotX="54"
+        android:pivotY="46"
+        android:rotation="-18">
+        <path
+            android:fillColor="#1A0088FF"
+            android:pathData="M-10,32 L118,32 L118,60 L-10,60 Z" />
+        <path
+            android:fillColor="#2600B4FF"
+            android:pathData="M-10,32 L118,32 L118,34 L-10,34 Z" />
+        <path
+            android:fillColor="#2600B4FF"
+            android:pathData="M-10,58 L118,58 L118,60 L-10,60 Z" />
+        <!-- Film frames -->
+        <path
+            android:fillColor="#FF040B1A"
+            android:pathData="M8,37 h16 v18 h-16 z M28,37 h16 v18 h-16 z M48,37 h16 v18 h-16 z M68,37 h16 v18 h-16 z M88,37 h16 v18 h-16 z" />
+    </group>
 </vector>

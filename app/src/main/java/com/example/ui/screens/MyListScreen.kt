@@ -35,6 +35,8 @@ import com.example.model.Movie
 import com.example.ui.MyListFilter
 import com.example.ui.UiStats
 import com.example.ui.components.MovieCard
+import com.example.ui.components.SupportFooterSection
+import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
 import com.example.ui.theme.FilmwebRed
 import com.example.ui.theme.RoyalBlue
@@ -49,10 +51,12 @@ fun MyListScreen(
     stats: UiStats,
     minFilmwebRating: Double = 6.5,
     maxFilmwebRating: Double = 10.0,
+    watchlistIds: Set<String> = emptySet(),
     onFilterChange: (MyListFilter) -> Unit,
     onMovieClick: (Movie) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     onToggleWatched: (Movie) -> Unit,
+    onToggleWatchlist: (Movie) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -85,7 +89,7 @@ fun MyListScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Twoje ulubione i obejrzane z Netflix, Prime Video, Max, Disney+ i SkyShowtime",
+                        text = "Lista Do obejrzenia (baza Room), ulubione i obejrzane",
                         style = MaterialTheme.typography.bodySmall,
                         color = RoyalBlue,
                         fontWeight = FontWeight.SemiBold
@@ -96,8 +100,16 @@ fun MyListScreen(
                     // Stats Cards Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        StatCard(
+                            label = "Do obejrzenia",
+                            value = "${stats.watchlistCount}",
+                            icon = "🔖",
+                            accentColor = AccentCyan,
+                            modifier = Modifier.weight(1f)
+                        )
+
                         StatCard(
                             label = "Ulubione",
                             value = "${stats.favoriteCount}",
@@ -173,6 +185,7 @@ fun MyListScreen(
                     ) {
                         Text(
                             text = when (currentFilter) {
+                                MyListFilter.WATCHLIST -> "🔖"
                                 MyListFilter.FAVORITES -> "💔"
                                 MyListFilter.WATCHED -> "👀"
                                 MyListFilter.ALL -> "📂"
@@ -181,6 +194,7 @@ fun MyListScreen(
                         )
                         Text(
                             text = when (currentFilter) {
+                                MyListFilter.WATCHLIST -> "Brak filmów na liście Do obejrzenia"
                                 MyListFilter.FAVORITES -> "Brak ulubionych filmów"
                                 MyListFilter.WATCHED -> "Nie oznaczono jeszcze żadnego filmu"
                                 MyListFilter.ALL -> "Twoja lista jest pusta"
@@ -190,7 +204,7 @@ fun MyListScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Przejdź do zakładki Katalog i kliknij serduszko ❤️ lub ptaszek ✔️ przy filmie.",
+                            text = "Przejdź do zakładki Katalog i kliknij zakładkę 🔖, serduszko ❤️ lub ptaszek ✔️ przy filmie.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -208,14 +222,23 @@ fun MyListScreen(
                         movie = movie,
                         isFavorite = favoriteIds.contains(movie.id),
                         isWatched = watchedIds.contains(movie.id),
+                        isInWatchlist = watchlistIds.contains(movie.id),
                         minFilmwebRating = minFilmwebRating,
                         maxFilmwebRating = maxFilmwebRating,
                         onMovieClick = { onMovieClick(movie) },
                         onToggleFavorite = { onToggleFavorite(movie) },
-                        onToggleWatched = { onToggleWatched(movie) }
+                        onToggleWatched = { onToggleWatched(movie) },
+                        onToggleWatchlist = { onToggleWatchlist(movie) }
                     )
                 }
             }
+        }
+
+        // Support Footer at bottom
+        item {
+            SupportFooterSection(
+                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+            )
         }
     }
 }

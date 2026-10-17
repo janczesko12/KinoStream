@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.MovieRepository
+import com.example.model.ContentTypeFilter
 import com.example.model.Movie
 import com.example.model.MovieGenre
 import com.example.model.MovieSortOption
@@ -32,6 +33,7 @@ enum class MainTab(val title: String) {
 
 enum class MyListFilter(val label: String) {
     ALL("Wszystkie"),
+    WATCHLIST("Do obejrzenia 🔖"),
     FAVORITES("Ulubione ❤️"),
     WATCHED("Obejrzane ✔️")
 }
@@ -40,6 +42,7 @@ enum class MyListFilter(val label: String) {
 data class UiStats(
     val favoriteCount: Int = 0,
     val watchedCount: Int = 0,
+    val watchlistCount: Int = 0,
     val averageWatchedRating: Double = 0.0,
     val totalWatchedMinutes: Int = 0
 )
@@ -50,6 +53,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allMovies: StateFlow<List<Movie>> = repository.movies
     val favoriteIds: StateFlow<Set<String>> = repository.favoriteMovieIds
     val watchedIds: StateFlow<Set<String>> = repository.watchedMovieIds
+    val watchlistIds: StateFlow<Set<String>> = repository.watchlistMovieIdsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
     val reminderIds: StateFlow<Set<String>> = repository.reminderMovieIds
     val themeMode: StateFlow<ThemeMode> = repository.themeMode
     val notificationsEnabled: StateFlow<Boolean> = repository.notificationsEnabled
@@ -58,6 +63,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Custom Filmweb rating range (configurable in Settings)
     val minFilmwebRating: StateFlow<Double> = repository.minFilmwebRating
     val maxFilmwebRating: StateFlow<Double> = repository.maxFilmwebRating
+
+    // Language of movie titles: false = English/Original (default), true = Polish
+    val usePolishTitles: StateFlow<Boolean> = repository.usePolishTitles
 
     // Automatic adding of new releases from Netflix, Prime Video, Max, Disney+
     val autoAddNewReleasesEnabled: StateFlow<Boolean> = repository.autoAddNewReleasesEnabled
@@ -74,6 +82,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedPlatform = MutableStateFlow<StreamingPlatform?>(null)
     val selectedPlatform: StateFlow<StreamingPlatform?> = _selectedPlatform.asStateFlow()
+
+    private val _contentTypeFilter = MutableStateFlow(ContentTypeFilter.ALL)
+    val contentTypeFilter: StateFlow<ContentTypeFilter> = _contentTypeFilter.asStateFlow()
 
     private val _selectedGenre = MutableStateFlow(MovieGenre.WSZYSTKIE)
     val selectedGenre: StateFlow<MovieGenre> = _selectedGenre.asStateFlow()
@@ -97,6 +108,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
+            repository.syncPolishStreamingTitles()
             repository.enrichCatalogPosters()
         }
         viewModelScope.launch {
@@ -115,7 +127,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val highRatingOnly: Boolean,
         val sort: MovieSortOption,
         val minRating: Double,
-        val maxRating: Double
+        val maxRating: Double,
+        val contentType: ContentTypeFilter = ContentTypeFilter.ALL
     )
 
     private val baseFilterParams = combine(
@@ -128,28 +141,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         FilterParams(query, platform, genre, highRatingOnly, sort, 6.5, 10.0)
     }
 
-    private val ratingRangePair = combine(
+    private val ratingAndTypePair = combine(
         minFilmwebRating,
-        maxFilmwebRating
-    ) { minR, maxR ->
-        minR to maxR
+        maxFilmwebRating,
+        contentTypeFilter
+    ) { minR, maxR, cType ->
+        Triple(minR, maxR, cType)
     }
 
     private val filterParams = combine(
         baseFilterParams,
-        ratingRangePair
-    ) { base, (minR, maxR) ->
-        base.copy(minRating = minR, maxRating = maxR)
+        ratingAndTypePair
+    ) { base, (minR, maxR, cType) ->
+        base.copy(minRating = minR, maxRating = maxR, contentType = cType)
     }
 
     val filteredMovies: StateFlow<List<Movie>> = combine(
         allMovies,
-        filterParams
-    ) { movies, params ->
+        filterParams,
+        usePolishTitles
+    ) { movies, params, usePolish ->
         movies.filter { movie ->
+            if (!movie.hasPolishDubbing) return@filter false
+
+            val matchesType = when (params.contentType) {
+                ContentTypeFilter.ALL -> true
+                ContentTypeFilter.MOVIES -> !movie.isSeries
+                ContentTypeFilter.SERIES -> movie.isSeries
+            }
+
             val matchesQuery = params.query.isBlank() ||
                 movie.title.contains(params.query, ignoreCase = true) ||
                 movie.originalTitle.contains(params.query, ignoreCase = true) ||
+                movie.polishTitle.contains(params.query, ignoreCase = true) ||
                 movie.director.contains(params.query, ignoreCase = true) ||
                 movie.cast.any { it.contains(params.query, ignoreCase = true) }
 
@@ -158,50 +182,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val matchesRating = !params.highRatingOnly ||
                 (movie.filmwebRating in params.minRating..params.maxRating)
 
-            matchesQuery && matchesPlatform && matchesGenre && matchesRating
-        }.let { list ->
-            when (params.sort) {
-                MovieSortOption.FILMWEB_RATING_DESC -> list.sortedByDescending { it.filmwebRating }
-                MovieSortOption.FILMWEB_RATING_ASC -> list.sortedBy { it.filmwebRating }
-                MovieSortOption.YEAR_DESC -> list.sortedByDescending { it.year }
-                MovieSortOption.TITLE_ASC -> list.sortedBy { it.title }
-                MovieSortOption.GENRE_ASC -> list.sortedBy { it.genre.displayName }
+            matchesType && matchesQuery && matchesPlatform && matchesGenre && matchesRating
+        }.map { it.withLanguage(usePolish) }
+            .let { list ->
+                when (params.sort) {
+                    MovieSortOption.FILMWEB_RATING_DESC -> list.sortedByDescending { it.filmwebRating }
+                    MovieSortOption.FILMWEB_RATING_ASC -> list.sortedBy { it.filmwebRating }
+                    MovieSortOption.YEAR_DESC -> list.sortedByDescending { it.year }
+                    MovieSortOption.TITLE_ASC -> list.sortedBy { it.title }
+                    MovieSortOption.GENRE_ASC -> list.sortedBy { it.genre.displayName }
+                }
             }
-        }
     }.flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.movies.value)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            repository.movies.value.map { it.withLanguage(repository.usePolishTitles.value) }
+        )
 
     val premiereMovies: StateFlow<List<Movie>> = combine(
         allMovies,
-        selectedPlatform
-    ) { movies, platform ->
-        movies.filter { it.isPremiere || it.isUpcoming || it.isAutoSynced }
+        selectedPlatform,
+        usePolishTitles
+    ) { movies, platform, usePolish ->
+        movies.filter { it.hasPolishDubbing && (it.isPremiere || it.isUpcoming || it.isAutoSynced) }
             .filter { platform == null || it.platforms.contains(platform) }
+            .map { it.withLanguage(usePolish) }
             .sortedByDescending { it.year }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val savedMovies: StateFlow<List<Movie>> = combine(
-        allMovies,
+    private val userSavedIdSets = combine(
         favoriteIds,
         watchedIds,
-        myListFilter
-    ) { movies, favs, watched, filter ->
+        watchlistIds
+    ) { favs, watched, watchlist ->
+        Triple(favs, watched, watchlist)
+    }
+
+    val savedMovies: StateFlow<List<Movie>> = combine(
+        allMovies,
+        userSavedIdSets,
+        myListFilter,
+        usePolishTitles
+    ) { movies, (favs, watched, watchlist), filter, usePolish ->
         movies.filter { movie ->
-            when (filter) {
-                MyListFilter.ALL -> favs.contains(movie.id) || watched.contains(movie.id)
+            movie.hasPolishDubbing && when (filter) {
+                MyListFilter.ALL -> favs.contains(movie.id) || watched.contains(movie.id) || watchlist.contains(movie.id)
+                MyListFilter.WATCHLIST -> watchlist.contains(movie.id)
                 MyListFilter.FAVORITES -> favs.contains(movie.id)
                 MyListFilter.WATCHED -> watched.contains(movie.id)
             }
-        }
+        }.map { it.withLanguage(usePolish) }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val stats: StateFlow<UiStats> = combine(
         allMovies,
         favoriteIds,
-        watchedIds
-    ) { movies, favs, watched ->
+        watchedIds,
+        watchlistIds
+    ) { movies, favs, watched, watchlist ->
         val watchedMovies = movies.filter { watched.contains(it.id) }
         val avgRating = if (watchedMovies.isNotEmpty()) {
             watchedMovies.map { it.filmwebRating }.average()
@@ -211,6 +252,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         UiStats(
             favoriteCount = favs.size,
             watchedCount = watched.size,
+            watchlistCount = watchlist.size,
             averageWatchedRating = avgRating,
             totalWatchedMinutes = totalMinutes
         )
@@ -236,6 +278,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedPlatform.value = if (_selectedPlatform.value == platform) null else platform
     }
 
+    fun setContentTypeFilter(filter: ContentTypeFilter) {
+        _contentTypeFilter.value = filter
+    }
+
     fun setGenre(genre: MovieGenre) {
         _selectedGenre.value = genre
     }
@@ -253,7 +299,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectMovie(movie: Movie?) {
-        _selectedMovie.value = movie
+        _selectedMovie.value = movie?.withLanguage(usePolishTitles.value)
+    }
+
+    fun setUsePolishTitles(enabled: Boolean) {
+        repository.setUsePolishTitles(enabled)
+        _selectedMovie.value = _selectedMovie.value?.withLanguage(enabled)
+        _snackbarMessage.value = if (enabled) {
+            "Włączono polskie nazwy filmów i seriali 🇵🇱"
+        } else {
+            "Przywrócono angielskie (oryginalne) nazwy filmów i seriali 🇬🇧"
+        }
     }
 
     fun setFilmwebRatingRange(minRating: Double, maxRating: Double) {
@@ -280,26 +336,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _snackbarMessage.value = if (count > 0) {
                 "Automatycznie pobrano i dodano $count nowych premier VOD! 🎬"
             } else {
-                "Katalog premier z Netflix, Prime Video, Max i Disney+ jest aktualny ✔️"
+                "Katalog premier z Netflix, Prime Video, Max, Disney+ i SkyShowtime jest aktualny ✔️"
             }
         }
     }
 
     fun toggleFavorite(movie: Movie) {
         val isFav = repository.toggleFavorite(movie.id)
+        val displayTitle = movie.displayTitle(usePolishTitles.value)
         _snackbarMessage.value = if (isFav) {
-            "Dodano „${movie.title}” do ulubionych ❤️"
+            "Dodano „$displayTitle” do ulubionych ❤️"
         } else {
-            "Usunięto „${movie.title}” z ulubionych"
+            "Usunięto „$displayTitle” z ulubionych"
         }
     }
 
     fun toggleWatched(movie: Movie) {
         val isWatched = repository.toggleWatched(movie.id)
+        val displayTitle = movie.displayTitle(usePolishTitles.value)
         _snackbarMessage.value = if (isWatched) {
-            "Oznaczono „${movie.title}” jako obejrzany ✔️"
+            "Oznaczono „$displayTitle” jako obejrzany ✔️"
         } else {
-            "Odznaczono film „${movie.title}”"
+            "Odznaczono film „$displayTitle”"
+        }
+    }
+
+    fun toggleWatchlist(movie: Movie) {
+        viewModelScope.launch {
+            val isInWatchlist = repository.toggleWatchlist(movie)
+            val displayTitle = movie.displayTitle(usePolishTitles.value)
+            _snackbarMessage.value = if (isInWatchlist) {
+                "Zapisano „$displayTitle” na liście Do obejrzenia 🔖"
+            } else {
+                "Usunięto „$displayTitle” z listy Do obejrzenia"
+            }
         }
     }
 

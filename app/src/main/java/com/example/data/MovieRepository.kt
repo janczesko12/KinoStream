@@ -2,6 +2,9 @@ package com.example.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.data.local.KinoStreamDatabase
+import com.example.data.local.WatchlistDao
+import com.example.data.local.WatchlistEntity
 import com.example.model.Movie
 import com.example.model.StreamingPlatform
 import com.example.ui.theme.ThemeMode
@@ -9,17 +12,25 @@ import com.example.util.NotificationHelper
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlin.math.round
 
-class MovieRepository(private val context: Context) {
+class MovieRepository(
+    private val context: Context,
+    private val watchlistDao: WatchlistDao = KinoStreamDatabase.getInstance(context).watchlistDao()
+) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("kinostream_user_prefs", Context.MODE_PRIVATE)
 
     private val _movies = MutableStateFlow<List<Movie>>(loadCatalogWithCachedPosters())
     val movies: StateFlow<List<Movie>> = _movies.asStateFlow()
+
+    val watchlistEntries: Flow<List<WatchlistEntity>> = watchlistDao.getAllWatchlistItems()
+    val watchlistMovieIdsFlow: Flow<Set<String>> = watchlistDao.getAllWatchlistIds().map { it.toSet() }
 
     private val _favoriteMovieIds = MutableStateFlow<Set<String>>(loadStringSet("fav_movie_ids"))
     val favoriteMovieIds: StateFlow<Set<String>> = _favoriteMovieIds.asStateFlow()
@@ -64,21 +75,69 @@ class MovieRepository(private val context: Context) {
     )
     val maxFilmwebRating: StateFlow<Double> = _maxFilmwebRating.asStateFlow()
 
+    // Language of movie titles: true = Polish titles pulled from Polish streaming platforms (default),
+    // false = Native/Original titles
+    private val _usePolishTitles = MutableStateFlow<Boolean>(
+        prefs.getBoolean("use_polish_streaming_titles", true)
+    )
+    val usePolishTitles: StateFlow<Boolean> = _usePolishTitles.asStateFlow()
+
     private fun loadCatalogWithCachedPosters(): List<Movie> {
-        return MovieCatalog.sampleMovies.map { movie ->
-            if (movie.posterUrl.isNotBlank() && movie.backdropUrl.isNotBlank()) {
-                movie
-            } else {
+        return MovieCatalog.sampleMovies
+            .filter { it.hasPolishDubbing }
+            .map { movie ->
+                val cachedPlTitle = prefs.getString("pl_title_${movie.id}", null)
+                val resolvedPlTitle = if (!cachedPlTitle.isNullOrBlank()) {
+                    cachedPlTitle
+                } else {
+                    PosterNetworkService.localizeTitleToPolish(
+                        rawTitle = movie.originalTitle,
+                        isSeries = movie.isSeries,
+                        catalogPolishFallback = movie.polishTitle
+                    )
+                }
                 val cachedPoster = prefs.getString("poster_url_${movie.id}", null)
-                if (!cachedPoster.isNullOrBlank()) {
+                movie.copy(
+                    title = resolvedPlTitle,
+                    polishTitle = resolvedPlTitle,
+                    posterUrl = if (movie.posterUrl.isNotBlank()) movie.posterUrl else (cachedPoster ?: ""),
+                    backdropUrl = if (movie.backdropUrl.isNotBlank()) movie.backdropUrl else (cachedPoster ?: "")
+                )
+            }
+    }
+
+    /**
+     * Pulls official Polish streaming titles from Polish VOD metadata for catalog items.
+     */
+    suspend fun syncPolishStreamingTitles() = coroutineScope {
+        val currentList = _movies.value.filter { it.hasPolishDubbing }
+        var anyUpdated = false
+        val updatedList = currentList.map { movie ->
+            async {
+                val resolvedPl = PosterNetworkService.fetchPolishStreamingTitle(
+                    originalTitle = movie.originalTitle,
+                    isSeries = movie.isSeries
+                )
+                val finalPl = PosterNetworkService.localizeTitleToPolish(
+                    rawTitle = movie.originalTitle,
+                    isSeries = movie.isSeries,
+                    catalogPolishFallback = movie.polishTitle.ifBlank { resolvedPl }
+                )
+                if (finalPl.isNotBlank() && finalPl != movie.polishTitle) {
+                    prefs.edit().putString("pl_title_${movie.id}", finalPl).apply()
+                    anyUpdated = true
                     movie.copy(
-                        posterUrl = movie.posterUrl.ifBlank { cachedPoster },
-                        backdropUrl = movie.backdropUrl.ifBlank { cachedPoster }
+                        title = finalPl,
+                        polishTitle = finalPl
                     )
                 } else {
                     movie
                 }
             }
+        }.awaitAll()
+
+        if (anyUpdated) {
+            _movies.value = updatedList.filter { it.hasPolishDubbing }
         }
     }
 
@@ -87,7 +146,7 @@ class MovieRepository(private val context: Context) {
      * and caches them locally. Returns immediately if all catalog items already have posters.
      */
     suspend fun enrichCatalogPosters() = coroutineScope {
-        val currentList = _movies.value
+        val currentList = _movies.value.filter { it.hasPolishDubbing }
         if (currentList.all { it.posterUrl.isNotBlank() }) return@coroutineScope
 
         val updatedList = currentList.map { movie ->
@@ -112,18 +171,19 @@ class MovieRepository(private val context: Context) {
             }
         }.awaitAll()
 
-        _movies.value = updatedList
+        _movies.value = updatedList.filter { it.hasPolishDubbing }
     }
 
     /**
-     * Automatically fetches new releases from Netflix, Prime Video, Max, and Disney+
-     * and adds them into the catalog.
+     * Automatically fetches new releases from Netflix, Prime Video, Max, Disney+, and SkyShowtime
+     * that have Polish dubbing and adds them into the catalog.
      */
     suspend fun syncLatestPlatformReleases(sendNotification: Boolean = false): Int {
         val discovered = PosterNetworkService.fetchLatestPlatformReleases()
+            .filter { it.hasPolishDubbing }
         if (discovered.isEmpty()) return 0
 
-        val current = _movies.value.toMutableList()
+        val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
         val existingIds = current.map { it.id }.toSet()
         val existingTitles = current.map { it.title.lowercase() }.toSet()
 
@@ -131,6 +191,7 @@ class MovieRepository(private val context: Context) {
         var firstAdded: Movie? = null
 
         for (item in discovered) {
+            if (!item.hasPolishDubbing) continue
             if (!existingIds.contains(item.id) && !existingTitles.contains(item.title.lowercase())) {
                 current.add(0, item)
                 addedCount++
@@ -141,14 +202,14 @@ class MovieRepository(private val context: Context) {
         }
 
         if (addedCount > 0) {
-            _movies.value = current
+            _movies.value = current.filter { it.hasPolishDubbing }
             _autoSyncedCount.value = _autoSyncedCount.value + addedCount
 
             if (sendNotification && _notificationsEnabled.value && firstAdded != null) {
                 NotificationHelper.sendPremiereNotification(
                     context = context,
-                    title = firstAdded.title,
-                    message = "Automatycznie dodano $addedCount nowości z platform VOD do katalogu!",
+                    title = firstAdded.displayTitle(_usePolishTitles.value),
+                    message = "Automatycznie dodano $addedCount nowości z polskim dubbingiem do katalogu!",
                     platformName = firstAdded.platforms.joinToString(", ") { it.displayName },
                     filmwebRating = firstAdded.filmwebRating
                 )
@@ -158,27 +219,29 @@ class MovieRepository(private val context: Context) {
     }
 
     /**
-     * Searches online APIs (TVMaze & Apple iTunes) for additional real movies & series with real photos,
+     * Searches online APIs (TVMaze & Apple iTunes) for additional real movies & series with Polish dubbing,
      * merging new results into the catalog so favorites/watched toggles also work on them.
      */
     suspend fun searchAndMergeOnline(query: String) {
         if (query.trim().length < 2) return
         val onlineResults = PosterNetworkService.searchLiveSeriesAndMovies(query)
+            .filter { it.hasPolishDubbing }
         if (onlineResults.isEmpty()) return
 
-        val existing = _movies.value.toMutableList()
+        val existing = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
         val existingIds = existing.map { it.id }.toSet()
         val existingTitles = existing.map { it.title.lowercase() }.toSet()
 
         var changed = false
         for (item in onlineResults) {
+            if (!item.hasPolishDubbing) continue
             if (!existingIds.contains(item.id) && !existingTitles.contains(item.title.lowercase())) {
                 existing.add(item)
                 changed = true
             }
         }
         if (changed) {
-            _movies.value = existing
+            _movies.value = existing.filter { it.hasPolishDubbing }
         }
     }
 
@@ -196,6 +259,11 @@ class MovieRepository(private val context: Context) {
     fun setAutoAddNewReleasesEnabled(enabled: Boolean) {
         _autoAddNewReleasesEnabled.value = enabled
         prefs.edit().putBoolean("auto_add_new_releases", enabled).apply()
+    }
+
+    fun setUsePolishTitles(enabled: Boolean) {
+        _usePolishTitles.value = enabled
+        prefs.edit().putBoolean("use_polish_streaming_titles", enabled).apply()
     }
 
     fun toggleFavorite(movieId: String): Boolean {
@@ -224,6 +292,51 @@ class MovieRepository(private val context: Context) {
         _watchedMovieIds.value = current
         saveStringSet("watched_movie_ids", current)
         return isNowWatched
+    }
+
+    suspend fun toggleWatchlist(movie: Movie): Boolean {
+        val exists = watchlistDao.isInWatchlist(movie.id)
+        return if (exists) {
+            watchlistDao.deleteByMovieId(movie.id)
+            false
+        } else {
+            watchlistDao.insertWatchlistItem(
+                WatchlistEntity(
+                    movieId = movie.id,
+                    title = movie.title,
+                    originalTitle = movie.originalTitle,
+                    polishTitle = movie.polishTitle,
+                    year = movie.year,
+                    isSeries = movie.isSeries,
+                    genreName = movie.genre.name,
+                    filmwebRating = movie.filmwebRating,
+                    posterUrl = movie.posterUrl,
+                    addedAt = System.currentTimeMillis()
+                )
+            )
+            true
+        }
+    }
+
+    suspend fun addToWatchlist(movie: Movie) {
+        watchlistDao.insertWatchlistItem(
+            WatchlistEntity(
+                movieId = movie.id,
+                title = movie.title,
+                originalTitle = movie.originalTitle,
+                polishTitle = movie.polishTitle,
+                year = movie.year,
+                isSeries = movie.isSeries,
+                genreName = movie.genre.name,
+                filmwebRating = movie.filmwebRating,
+                posterUrl = movie.posterUrl,
+                addedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun removeFromWatchlist(movieId: String) {
+        watchlistDao.deleteByMovieId(movieId)
     }
 
     fun toggleReminder(movieId: String): Boolean {

@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
@@ -52,11 +54,14 @@ fun MovieCard(
     onToggleFavorite: () -> Unit,
     onToggleWatched: () -> Unit,
     modifier: Modifier = Modifier,
+    isInWatchlist: Boolean = false,
+    onToggleWatchlist: () -> Unit = {},
     minFilmwebRating: Double = 6.5,
     maxFilmwebRating: Double = 10.0
 ) {
     val cardBorderColor = when {
         isWatched -> FilmwebGreen.copy(alpha = 0.5f)
+        isInWatchlist -> AccentCyan.copy(alpha = 0.6f)
         isFavorite -> RoyalBlue.copy(alpha = 0.5f)
         else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     }
@@ -105,7 +110,8 @@ fun MovieCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -161,8 +167,22 @@ fun MovieCard(
                             }
                         }
 
+                        Box(
+                            modifier = Modifier
+                                .clip(TagShape)
+                                .background(FilmwebGreen.copy(alpha = 0.14f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "PL Dubbing",
+                                color = FilmwebGreen,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
                         Text(
-                            text = if (movie.isSeries) "• ${movie.durationMinutes}m/odc." else "• ${movie.durationMinutes} min",
+                            text = if (movie.isSeries) "• ${movie.durationMinutes}m" else "• ${movie.durationMinutes} min",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -207,6 +227,21 @@ fun MovieCard(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Przycisk "Do obejrzenia" (Watchlist - Room database)
+                        IconButton(
+                            onClick = onToggleWatchlist,
+                            modifier = Modifier
+                                .testTag("btn_watchlist_${movie.id}")
+                                .size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = if (isInWatchlist) "Usuń z listy Do obejrzenia" else "Dodaj do listy Do obejrzenia",
+                                tint = if (isInWatchlist) AccentCyan else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
                         // Mały ptaszek do odhaczenia gdy film już został obejrzany
                         IconButton(
                             onClick = onToggleWatched,

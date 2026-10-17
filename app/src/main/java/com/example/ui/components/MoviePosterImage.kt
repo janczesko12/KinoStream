@@ -9,10 +9,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.example.data.PosterNetworkService
 import com.example.model.Movie
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
@@ -39,7 +46,7 @@ private val PosterVignetteBrush = Brush.verticalGradient(
         Color.Black.copy(alpha = 0.42f),
         Color.Transparent,
         Color.Transparent,
-        Color.Black.copy(alpha = 0.52f)
+        Color.Black.copy(alpha = 0.56f)
     )
 )
 
@@ -61,16 +68,36 @@ fun MoviePosterImage(
         )
     }
 
-    val posterUrl = movie.posterUrl.ifBlank { movie.backdropUrl }
-    val imageRequest = remember(context, posterUrl) {
-        if (posterUrl.isBlank()) {
+    val initialUrl = remember(movie.id, movie.posterUrl, movie.backdropUrl) {
+        PosterNetworkService.getCachedPosterUrl(movie.originalTitle)
+            ?: movie.posterUrl.ifBlank { movie.backdropUrl }
+    }
+    var activePosterUrl by remember(movie.id, initialUrl) { mutableStateOf(initialUrl) }
+    var shouldFetchFallback by remember(movie.id, initialUrl) { mutableStateOf(initialUrl.isBlank()) }
+
+    // Automatically resolve official poster/logo if missing or if image load failed
+    LaunchedEffect(movie.id, shouldFetchFallback) {
+        if (shouldFetchFallback) {
+            val fetched = PosterNetworkService.fetchOfficialPosterUrl(
+                originalTitle = movie.originalTitle.ifBlank { movie.title },
+                isSeries = movie.isSeries
+            )
+            if (!fetched.isNullOrBlank() && fetched != activePosterUrl) {
+                activePosterUrl = fetched
+            }
+            shouldFetchFallback = false
+        }
+    }
+
+    val imageRequest = remember(context, activePosterUrl) {
+        if (activePosterUrl.isBlank()) {
             null
         } else {
             ImageRequest.Builder(context)
-                .data(posterUrl)
+                .data(activePosterUrl)
                 .size(260, 390)
-                .memoryCacheKey(posterUrl)
-                .diskCacheKey(posterUrl)
+                .memoryCacheKey(activePosterUrl)
+                .diskCacheKey(activePosterUrl)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.ENABLED)
                 .crossfade(false)
@@ -93,6 +120,11 @@ fun MoviePosterImage(
                 model = imageRequest,
                 contentDescription = "Plakat: ${movie.title}",
                 contentScale = ContentScale.Crop,
+                onError = {
+                    if (!shouldFetchFallback) {
+                        shouldFetchFallback = true
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -166,6 +198,89 @@ fun MoviePosterImage(
                     letterSpacing = 0.8.sp
                 )
             }
+        }
+    }
+}
+
+/**
+ * Circular profile icon / logo badge for a movie or TV series with automatic online fallback resolution.
+ */
+@Composable
+fun MovieProfileAvatar(
+    movie: Movie,
+    size: Dp = 28.dp,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val brandColor = movie.platforms.firstOrNull()?.brandColor ?: RoyalBlue
+    val backgroundBrush = remember(movie.id) {
+        Brush.linearGradient(
+            colors = movie.posterGradientColors.map { Color(it) }
+        )
+    }
+
+    val initialLogoUrl = remember(movie.id, movie.profileLogoUrl, movie.posterUrl) {
+        PosterNetworkService.getCachedPosterUrl(movie.originalTitle)
+            ?: movie.profileLogoUrl.ifBlank { movie.posterUrl.ifBlank { movie.backdropUrl } }
+    }
+    var activeLogoUrl by remember(movie.id, initialLogoUrl) { mutableStateOf(initialLogoUrl) }
+    var shouldFetchLogo by remember(movie.id, initialLogoUrl) { mutableStateOf(initialLogoUrl.isBlank()) }
+
+    LaunchedEffect(movie.id, shouldFetchLogo) {
+        if (shouldFetchLogo) {
+            val resolved = PosterNetworkService.fetchOfficialPosterUrl(
+                originalTitle = movie.originalTitle.ifBlank { movie.title },
+                isSeries = movie.isSeries
+            )
+            if (!resolved.isNullOrBlank() && resolved != activeLogoUrl) {
+                activeLogoUrl = resolved
+            }
+            shouldFetchLogo = false
+        }
+    }
+
+    val avatarRequest = remember(context, activeLogoUrl) {
+        if (activeLogoUrl.isBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(activeLogoUrl)
+                .size(120, 120)
+                .memoryCacheKey("avatar_$activeLogoUrl")
+                .diskCacheKey(activeLogoUrl)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .crossfade(false)
+                .setHeader("User-Agent", "Mozilla/5.0 (Android; KinoStream/1.0)")
+                .build()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(backgroundBrush)
+            .border(1.5.dp, brandColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = movie.posterEmoji,
+            fontSize = (size.value * 0.46f).sp
+        )
+
+        if (avatarRequest != null) {
+            AsyncImage(
+                model = avatarRequest,
+                contentDescription = "Ikona profilowa: ${movie.title}",
+                contentScale = ContentScale.Crop,
+                onError = {
+                    if (!shouldFetchLogo) {
+                        shouldFetchLogo = true
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }

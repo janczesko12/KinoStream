@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
+import com.example.ui.components.SupportFooterSection
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
 import com.example.ui.theme.FilmwebRed
@@ -84,6 +85,7 @@ fun SettingsScreen(
     autoAddNewReleasesEnabled: Boolean = true,
     autoSyncedCount: Int = 0,
     isSyncingNewReleases: Boolean = false,
+    usePolishTitles: Boolean = true,
     onThemeModeChange: (ThemeMode) -> Unit,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onToggleNotificationPlatform: (StreamingPlatform) -> Unit,
@@ -91,6 +93,7 @@ fun SettingsScreen(
     onFilmwebRatingRangeChange: (Double, Double) -> Unit = { _, _ -> },
     onAutoAddNewReleasesChange: (Boolean) -> Unit = {},
     onSyncNewReleasesNow: () -> Unit = {},
+    onUsePolishTitlesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -140,11 +143,142 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Przedział oceny Filmweb, automatyczne premiery VOD i komfort oczu",
+                        text = "Język tytułów (EN/PL), przedział oceny Filmweb, premiery VOD i komfort oczu",
                         style = MaterialTheme.typography.bodySmall,
                         color = RoyalBlue,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
+        }
+
+        // Section 0: Movie Title Language from Polish Streaming (English/Native vs Polish Streaming)
+        item {
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .testTag("card_title_language_settings"),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                shape = RoundedCornerShape(16.dp),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = Brush.horizontalGradient(
+                        listOf(RoyalBlue.copy(alpha = 0.6f), AccentCyan.copy(alpha = 0.4f))
+                    )
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Nazwy z Polskiego Streamingu (PL / NAT)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Tytuły zaciągane z polskiego streamingu — pozycje nietłumaczone (np. Breaking Bad, The Boys, Fallout) zostają bez zmian w obu trybach",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Switch(
+                            checked = usePolishTitles,
+                            onCheckedChange = onUsePolishTitlesChange,
+                            modifier = Modifier.testTag("switch_polish_titles"),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = RoyalBlue
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Option 1: Polish Streaming Titles (Default)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("option_polish_titles")
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (usePolishTitles) RoyalBlue.copy(alpha = 0.12f) else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (usePolishTitles) RoyalBlue.copy(alpha = 0.5f) else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onUsePolishTitlesChange(true) }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🇵🇱 Polskie nazwy ze streamingów (Domyślnie)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (usePolishTitles) FontWeight.Bold else FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Zaciągane z polskich platform VOD (np. Incepcja, Wiedźmin, Ród Smoka, Diuna: Część druga, a nietłumaczone jak Breaking Bad czy The Boys zostają bez zmian)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        RadioButton(
+                            selected = usePolishTitles,
+                            onClick = { onUsePolishTitlesChange(true) },
+                            colors = RadioButtonDefaults.colors(selectedColor = RoyalBlue)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Option 2: Native / Original Titles
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("option_english_titles")
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (!usePolishTitles) RoyalBlue.copy(alpha = 0.12f) else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (!usePolishTitles) RoyalBlue.copy(alpha = 0.5f) else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onUsePolishTitlesChange(false) }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🇬🇧 Oryginalne / Natywne nazwy (EN)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (!usePolishTitles) FontWeight.Bold else FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Np. Inception, The Witcher, House of the Dragon, Dune: Part Two, Breaking Bad, The Boys",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        RadioButton(
+                            selected = !usePolishTitles,
+                            onClick = { onUsePolishTitlesChange(false) },
+                            colors = RadioButtonDefaults.colors(selectedColor = RoyalBlue)
+                        )
+                    }
                 }
             }
         }
@@ -842,6 +976,13 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+
+        // Section 6: Support Footer ("Postaw mi kawę" + "Created with ❤️ by: Jan Czesko")
+        item {
+            SupportFooterSection(
+                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+            )
         }
     }
 }

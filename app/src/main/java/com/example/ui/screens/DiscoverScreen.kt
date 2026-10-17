@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.ContentTypeFilter
 import com.example.model.Movie
 import com.example.model.MovieGenre
 import com.example.model.MovieSortOption
@@ -60,10 +61,10 @@ import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
 import com.example.ui.components.MovieCard
 import com.example.ui.components.MoviePosterImage
+import com.example.ui.components.SupportFooterSection
+import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
-import com.example.ui.theme.FilmwebYellow
 import com.example.ui.theme.RoyalBlue
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,24 +80,22 @@ fun DiscoverScreen(
     minFilmwebRating: Double = 6.5,
     maxFilmwebRating: Double = 10.0,
     autoSyncedCount: Int = 0,
+    usePolishTitles: Boolean = true,
+    contentTypeFilter: ContentTypeFilter = ContentTypeFilter.ALL,
     onSearchQueryChange: (String) -> Unit,
     onPlatformSelect: (StreamingPlatform?) -> Unit,
+    onContentTypeSelect: (ContentTypeFilter) -> Unit = {},
     onGenreSelect: (MovieGenre) -> Unit,
     onToggleHighRating: () -> Unit,
     onSortOptionSelect: (MovieSortOption) -> Unit,
     onMovieClick: (Movie) -> Unit,
     onToggleFavorite: (Movie) -> Unit,
     onToggleWatched: (Movie) -> Unit,
+    watchlistIds: Set<String> = emptySet(),
+    onToggleWatchlist: (Movie) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
-    val ratingChipText = remember(minFilmwebRating, maxFilmwebRating) {
-        if (maxFilmwebRating >= 10.0) {
-            String.format(Locale.US, "Tylko z Filmweb ≥ %.1f", minFilmwebRating)
-        } else {
-            String.format(Locale.US, "Filmweb: %.1f – %.1f", minFilmwebRating, maxFilmwebRating)
-        }
-    }
 
     Column(
         modifier = modifier
@@ -127,6 +126,14 @@ fun DiscoverScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.img_app_logo),
+                            contentDescription = "Logo KinoStream",
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+
                         Text(
                             text = "KinoStream",
                             style = MaterialTheme.typography.titleLarge,
@@ -142,7 +149,7 @@ fun DiscoverScreen(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "4 PLATFORMY VOD",
+                                text = "5 PLATFORM • PL DUBBING",
                                 color = RoyalBlue,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -194,7 +201,11 @@ fun DiscoverScreen(
                         .fillMaxWidth(),
                     placeholder = {
                         Text(
-                            "Szukaj filmu lub serialu (np. Diuna, The Boys, Fallout)...",
+                            if (usePolishTitles) {
+                                "Szukaj polskiego tytułu (np. Incepcja, Diuna, Chłopaki, Król Tulsy)..."
+                            } else {
+                                "Szukaj filmu lub serialu (np. Inception, Dune, The Boys, Tulsa King)..."
+                            },
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -230,41 +241,7 @@ fun DiscoverScreen(
                     )
                 )
 
-                // Quick Title Suggestions Row
-                if (searchQuery.isEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Szybkie wyszukiwanie:",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        val quickTitles = listOf("Diuna", "The Boys", "Fallout", "The Last of Us", "Oppenheimer", "Gladiator II", "Szōgun", "Wednesday", "Ród Smoka")
-                        quickTitles.forEach { title ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                                    .clickable { onSearchQueryChange(title) }
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = title,
-                                    fontSize = 11.sp,
-                                    color = RoyalBlue,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                } else {
+                if (searchQuery.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -297,11 +274,63 @@ fun DiscoverScreen(
             contentPadding = PaddingValues(top = 10.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 4 Streaming Platforms Selector Row (Netflix, Prime Video, Max, Disney+)
-            item {
+            // Content Type Filter Row: Wszystkie | 🎬 Filmy | 📺 Seriale
+            item(contentType = "content_type_selector") {
                 Column {
                     Text(
-                        text = "Platforma streamingowa (Netflix • Prime Video • Max • Disney+):",
+                        text = "Typ treści (Filmy / Seriale):",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val types = listOf(
+                            Triple(ContentTypeFilter.ALL, "✨ Wszystkie", RoyalBlue),
+                            Triple(ContentTypeFilter.MOVIES, "🎬 Filmy", RoyalBlue),
+                            Triple(ContentTypeFilter.SERIES, "📺 Seriale", AccentCyan)
+                        )
+                        types.forEach { (filter, label, activeColor) ->
+                            val isSelected = contentTypeFilter == filter
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("filter_type_${filter.name.lowercase()}")
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) activeColor else MaterialTheme.colorScheme.surface)
+                                    .border(
+                                        1.5.dp,
+                                        if (isSelected) activeColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { onContentTypeSelect(filter) }
+                                    .padding(vertical = 9.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5 Streaming Platforms Selector Row (Netflix, Prime Video, Max, Disney+, SkyShowtime)
+            item(contentType = "platform_selector") {
+                Column {
+                    Text(
+                        text = "Platforma VOD (tylko filmy i seriale z polskim dubbingiem):",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -354,6 +383,14 @@ fun DiscoverScreen(
                             brandColor = StreamingPlatform.DISNEY_PLUS.brandColor,
                             onClick = { onPlatformSelect(StreamingPlatform.DISNEY_PLUS) },
                             modifier = Modifier.width(82.dp)
+                        )
+
+                        PlatformFilterPill(
+                            title = "SkyShowtime",
+                            isSelected = selectedPlatform == StreamingPlatform.SKYSHOWTIME,
+                            brandColor = StreamingPlatform.SKYSHOWTIME.brandColor,
+                            onClick = { onPlatformSelect(StreamingPlatform.SKYSHOWTIME) },
+                            modifier = Modifier.width(106.dp)
                         )
                     }
                 }
@@ -518,45 +555,15 @@ fun DiscoverScreen(
                 }
             }
 
-            // Filmweb Filter Chip & Results Counter
+            // Results Counter
             item(contentType = "rating_filter_bar") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilterChip(
-                        selected = onlyHighRating,
-                        onClick = onToggleHighRating,
-                        label = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = if (onlyHighRating) Color.White else FilmwebYellow,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = ratingChipText,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = RoyalBlue,
-                            selectedLabelColor = Color.White,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            labelColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-
                     Text(
                         text = "Znaleziono: ${movies.size}",
                         style = MaterialTheme.typography.bodySmall,
@@ -605,14 +612,23 @@ fun DiscoverScreen(
                             movie = movie,
                             isFavorite = favoriteIds.contains(movie.id),
                             isWatched = watchedIds.contains(movie.id),
+                            isInWatchlist = watchlistIds.contains(movie.id),
                             minFilmwebRating = minFilmwebRating,
                             maxFilmwebRating = maxFilmwebRating,
                             onMovieClick = { onMovieClick(movie) },
                             onToggleFavorite = { onToggleFavorite(movie) },
-                            onToggleWatched = { onToggleWatched(movie) }
+                            onToggleWatched = { onToggleWatched(movie) },
+                            onToggleWatchlist = { onToggleWatchlist(movie) }
                         )
                     }
                 }
+            }
+
+            // Support Footer at bottom of catalog ("Postaw mi kawę" + "Created with ❤️ by: Jan Czesko")
+            item(contentType = "support_footer") {
+                SupportFooterSection(
+                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+                )
             }
         }
     }
@@ -661,7 +677,8 @@ private fun FeaturedPosterItem(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Text(

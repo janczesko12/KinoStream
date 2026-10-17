@@ -35,6 +35,12 @@ enum class MovieGenre(val displayName: String) {
     PRZYGODOWY("Przygodowy")
 }
 
+enum class ContentTypeFilter(val label: String) {
+    ALL("Wszystkie"),
+    MOVIES("Filmy"),
+    SERIES("Seriale")
+}
+
 @Immutable
 data class Movie(
     val id: String,
@@ -58,13 +64,25 @@ data class Movie(
     val isPremiere: Boolean = false,
     val isUpcoming: Boolean = false,
     val isAutoSynced: Boolean = false,
-    val ageRating: String = "16+"
+    val hasPolishDubbing: Boolean = true,
+    val ageRating: String = "16+",
+    val polishTitle: String = title,
+    val profileLogoUrl: String = posterUrl.ifBlank { backdropUrl }
 ) {
     val isRecommendedOnFilmweb: Boolean
         get() = filmwebRating >= 6.5
 
     fun isWithinRatingRange(minRating: Double, maxRating: Double): Boolean =
         filmwebRating in minRating..maxRating
+
+    fun displayTitle(usePolishTitles: Boolean = true): String =
+        if (usePolishTitles) polishTitle.ifBlank { title } else originalTitle.ifBlank { title }
+
+    fun secondaryTitle(usePolishTitles: Boolean = true): String =
+        if (usePolishTitles) originalTitle.ifBlank { title } else polishTitle.ifBlank { title }
+
+    fun withLanguage(usePolishTitles: Boolean = true): Movie =
+        copy(title = displayTitle(usePolishTitles))
 }
 
 enum class MovieSortOption(val displayName: String) {

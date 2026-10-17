@@ -19,12 +19,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
@@ -73,8 +75,11 @@ fun MovieDetailSheet(
     onToggleFavorite: () -> Unit,
     onToggleWatched: () -> Unit,
     onToggleReminder: () -> Unit,
+    isInWatchlist: Boolean = false,
+    onToggleWatchlist: () -> Unit = {},
     minFilmwebRating: Double = 6.5,
-    maxFilmwebRating: Double = 10.0
+    maxFilmwebRating: Double = 10.0,
+    usePolishTitles: Boolean = true
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
@@ -108,7 +113,8 @@ fun MovieDetailSheet(
                         )
                     )
             ) {
-                val heroUrl = movie.backdropUrl.ifBlank { movie.posterUrl }
+                val heroUrl = com.example.data.PosterNetworkService.getCachedPosterUrl(movie.originalTitle)
+                    ?: movie.backdropUrl.ifBlank { movie.posterUrl }
                 val backdropRequest = androidx.compose.runtime.remember(context, heroUrl) {
                     if (heroUrl.isBlank()) null
                     else ImageRequest.Builder(context)
@@ -220,15 +226,22 @@ fun MovieDetailSheet(
                             }
                         }
 
+                        val primaryTitle = movie.displayTitle(usePolishTitles)
+                        val altTitle = movie.secondaryTitle(usePolishTitles)
+
                         Text(
-                            text = movie.title,
+                            text = primaryTitle,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
+                        val altLabel = if (altTitle.isNotBlank() && !altTitle.equals(primaryTitle, ignoreCase = true)) {
+                            if (usePolishTitles) "Oryg.: $altTitle • " else "PL: $altTitle • "
+                        } else ""
+
                         Text(
-                            text = "${movie.originalTitle} (${movie.year}) • ${movie.durationMinutes} min • ${movie.ageRating}",
+                            text = "${altLabel}Polski dubbing 🇵🇱 • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -292,6 +305,32 @@ fun MovieDetailSheet(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Watchlist Action Button (Room Database)
+                Button(
+                    onClick = onToggleWatchlist,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("detail_watchlist_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isInWatchlist) AccentCyan else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (isInWatchlist) Color.White else MaterialTheme.colorScheme.onSurface
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isInWatchlist) "Na liście Do obejrzenia 🔖" else "Zapisz do obejrzenia na później",
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
                 if (movie.isPremiere || movie.isUpcoming) {
