@@ -8,13 +8,17 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: kinostream-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Verify and package KinoStream
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK
         uses: actions/setup-java@v5
