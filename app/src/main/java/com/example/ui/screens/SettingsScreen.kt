@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
+import com.example.ui.components.AppUpdateSection
 import com.example.ui.components.SupportFooterSection
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
@@ -150,6 +151,15 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        // App updates are checked whenever the user opens Settings.
+        item {
+            AppUpdateSection(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+            )
         }
 
         // Section 0: Movie Title Language from Polish Streaming (English/Native vs Polish Streaming)
