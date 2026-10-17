@@ -48,14 +48,22 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE
         )
 
+        val ratingText = filmwebRating.takeIf { it > 0.0 }
+            ?.let { "Ocena Filmweb: $it/10 ⭐" }
+        val expandedText = buildString {
+            append(message)
+            append("\\n\\nPlatforma: $platformName")
+            ratingText?.let {
+                append("\\n")
+                append(it)
+            }
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("🎬 Nowa premiera na $platformName: $title")
-            .setContentText("$message • Ocena Filmweb: $filmwebRating/10")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("$message\n\nPlatforma: $platformName\nOcena społeczności Filmweb: $filmwebRating/10 ⭐")
-            )
+            .setContentText(listOfNotNull(message, ratingText).joinToString(" • "))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
