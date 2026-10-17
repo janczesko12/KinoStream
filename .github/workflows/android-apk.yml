@@ -65,6 +65,30 @@ jobs:
           fi
           echo "TMDB providers returned for Poland:"
           jq -r '[.results[].provider_name] | join(", ")' "$providers_file"
+          # Validate that the actual discover endpoint returns catalogue rows, not only provider names.
+          for provider_label in Netflix Prime Disney SkyShowtime Max; do
+            case "$provider_label" in
+              Netflix) provider_id=$(jq -r '.results[] | select(.provider_name | ascii_downcase | contains("netflix")) | .provider_id' "$providers_file" | head -n1) ;;
+              Prime) provider_id=$(jq -r '.results[] | select(.provider_name | ascii_downcase | contains("amazon prime video")) | .provider_id' "$providers_file" | head -n1) ;;
+              Disney) provider_id=$(jq -r '.results[] | select(.provider_name | ascii_downcase | contains("disney plus")) | .provider_id' "$providers_file" | head -n1) ;;
+              SkyShowtime) provider_id=$(jq -r '.results[] | select(.provider_name | ascii_downcase | contains("skyshowtime")) | .provider_id' "$providers_file" | head -n1) ;;
+              Max) provider_id=$(jq -r '.results[] | select((.provider_name | ascii_downcase | contains("hbo max")) or (.provider_name | ascii_downcase) == "max") | .provider_id' "$providers_file" | head -n1) ;;
+            esac
+            if [[ -z "${provider_id:-}" || "$provider_id" == "null" ]]; then
+              echo "No TMDB provider ID mapped for $provider_label"
+              continue
+            fi
+            for media_type in movie tv; do
+              discover_url="https://api.themoviedb.org/3/discover/$media_type?language=pl-PL&region=PL&watch_region=PL&with_watch_providers=$provider_id&with_watch_monetization_types=flatrate%2Cfree%2Cads&include_adult=false&sort_by=popularity.desc&page=1"
+              if [[ "$TMDB_API_KEY" == *.*.* ]]; then
+                result_json=$(curl --silent --show-error --header "Authorization: Bearer $TMDB_API_KEY" "$discover_url")
+              else
+                result_json=$(curl --silent --show-error --get --data-urlencode "api_key=$TMDB_API_KEY" "$discover_url")
+              fi
+              result_count=$(printf '%s' "$result_json" | jq -r '.results | length' 2>/dev/null || echo 0)
+              echo "TMDB discover $media_type / $provider_label: $result_count results"
+            done
+          done
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
