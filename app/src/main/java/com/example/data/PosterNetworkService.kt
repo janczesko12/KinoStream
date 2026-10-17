@@ -682,7 +682,7 @@ object PosterNetworkService {
             .header("User-Agent", "KinoStream-Android")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return emptyList()
             val body = response.body?.string() ?: return emptyList()
             val items = JSONObject(body).optJSONArray("results") ?: return emptyList()
