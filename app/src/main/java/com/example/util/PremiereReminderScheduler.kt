@@ -8,7 +8,6 @@ import com.example.model.Movie
 import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
