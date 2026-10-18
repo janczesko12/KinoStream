@@ -297,33 +297,50 @@ class MovieRepository(
      * that have Polish dubbing and adds them into the catalog.
      */
     suspend fun syncLatestPlatformReleases(sendNotification: Boolean = false): Int {
-        val discovered = PosterNetworkService.fetchLatestPlatformReleases()
+        val discovered = runCatching { PosterNetworkService.fetchLatestPlatformReleases() }
+            .getOrDefault(emptyList())
             .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
         if (discovered.isEmpty()) return 0
 
         val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
         val existingIds = current.mapTo(mutableSetOf()) { it.id }
         val existingTitles = current.mapTo(mutableSetOf()) { it.title.trim().lowercase() }
-
         var addedCount = 0
         var firstAdded: Movie? = null
+        var changed = false
 
         for (item in discovered) {
-            if (!item.hasPolishDubbing) continue
-            if (existingIds.add(item.id) && existingTitles.add(item.title.trim().lowercase())) {
-                current.add(0, item)
-                addedCount++
-                if (firstAdded == null) {
-                    firstAdded = item
+            val existingIndex = current.indexOfFirst {
+                it.id == item.id || it.title.trim().equals(item.title.trim(), ignoreCase = true)
+            }
+            if (existingIndex >= 0) {
+                val existing = current[existingIndex]
+                val refreshed = existing.copy(
+                    platforms = (existing.platforms + item.platforms).distinct(),
+                    premiereDate = item.premiereDate ?: existing.premiereDate,
+                    isPremiere = true,
+                    isUpcoming = false,
+                    isAvailabilityVerified = true
+                )
+                if (refreshed != existing) {
+                    current[existingIndex] = refreshed
+                    changed = true
                 }
+            } else if (existingIds.add(item.id) && existingTitles.add(item.title.trim().lowercase())) {
+                val newPremiere = item.copy(isPremiere = true, isAutoSynced = true)
+                current.add(0, newPremiere)
+                addedCount++
+                changed = true
+                if (firstAdded == null) firstAdded = newPremiere
             }
         }
 
-        if (addedCount > 0) {
+        if (changed) {
             _movies.value = current.filter { it.hasPolishDubbing }
             persistDiscoveredMovies(_movies.value.filter(::isOnlineDiscovery))
+        }
+        if (addedCount > 0) {
             _autoSyncedCount.value = _autoSyncedCount.value + addedCount
-
             if (sendNotification && _notificationsEnabled.value && firstAdded != null &&
                 firstAdded.isAvailabilityVerified &&
                 firstAdded.platforms.any { it in _enabledNotificationPlatforms.value }
@@ -331,7 +348,7 @@ class MovieRepository(
                 NotificationHelper.sendPremiereNotification(
                     context = context,
                     title = firstAdded.displayTitle(_usePolishTitles.value),
-                    message = "Automatycznie dodano $addedCount nowości z polskim dubbingiem do katalogu!",
+                    message = "Dodano $addedCount nowych tytułów z potwierdzoną dostępnością w polskim VOD.",
                     platformName = firstAdded.platforms.joinToString(", ") { it.displayName },
                     filmwebRating = firstAdded.filmwebRating.takeIf { firstAdded.hasRating } ?: 0.0
                 )
