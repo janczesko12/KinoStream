@@ -390,9 +390,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val count = repository.syncLatestPlatformReleases(sendNotification = true)
             _isSyncingNewReleases.value = false
             _snackbarMessage.value = if (count > 0) {
-                "Automatycznie dodano $count premier ze zweryfikowaną dostępnością VOD. 🎬"
+                "Dodano $count nowych tytułów dostępnych w polskim VOD. 🎬"
             } else {
-                "Nie znaleziono premier z potwierdzoną dostępnością w polskim VOD. Nie dodano niezweryfikowanych pozycji."
+                "Odświeżono dane premier. Lista pokazuje tytuły z ostatnich 180 dni, których dostępność na platformach w Polsce została potwierdzona."
             }
         }
     }
