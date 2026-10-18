@@ -36,16 +36,18 @@ Przed wdrożeniem przejrzyj reguły obecnie działające w Firebase Console. **N
 
 ## 4. Powiadomienia e-mail o nowych zgłoszeniach
 
-Aplikacja zapisuje każde zgłoszenie z odbiorcą `janczeszko12@gmail.com` oraz wiadomością tekstową. Reguły Firestore ograniczają adres odbiorcy i temat wiadomości, aby klient nie mógł skierować ich na dowolny adres.
+Firebase Extensions nie są do tego potrzebne. KinoStream zapisuje zgłoszenie w Firestore, a następnie wywołuje osobny Cloudflare Worker. Worker korzysta z Resend API i wysyła e-mail z `powiadomienia@novydev.pl` do `janczesko12@gmail.com`. Nie wymaga to instalowania rozszerzenia Firebase ani zmiany projektu na Blaze.
 
-Aby Firebase faktycznie wysyłał te wiadomości:
-1. W Firebase Console otwórz **Extensions → Explore extensions** i zainstaluj oficjalne rozszerzenie **Trigger Email from Firestore** (`firestore-send-email`).
-2. Jako kolekcję dokumentów e-mail ustaw dokładnie `problem_reports`.
-3. Podaj działające dane serwera SMTP dostawcy poczty, adres nadawcy oraz ustawienia wymagane przez kreator rozszerzenia. Adres nadawcy musi być dozwolony przez dostawcę poczty; sama nazwa `noreply@kinostream.firebase.com` nie tworzy skrzynki ani nie zapewnia możliwości wysyłki.
-4. Sprawdź, czy rozszerzenie ma uprawnienia do zapisu statusu dostarczenia oraz czy Firestore używa reguł z tego repozytorium. Najpierw połącz je z bieżącymi regułami projektu — nie zastępuj innych reguł w ciemno.
-5. Wyślij testowe zgłoszenie i sprawdź skrzynkę odbiorczą oraz spam. Dokument zgłoszenia zapisuje się przed wysłaniem; status w panelu oznacza zapisanie zgłoszenia, nie gwarantuje dostarczenia e-maila.
+Instrukcja wdrożenia znajduje się w [cloudflare/kinostream-report-email/README.md](../cloudflare/kinostream-report-email/README.md). W skrócie:
+1. Dodaj i zweryfikuj domenę `novydev.pl` w Resend. Skopiuj **dokładne** rekordy DNS podane przez Resend do Cloudflare DNS i poczekaj, aż Resend pokaże status Verified.
+2. Utwórz Worker `kinostream-report-email` z katalogu `cloudflare/kinostream-report-email`.
+3. Dodaj `RESEND_API_KEY` w Cloudflare jako sekret Worker — nigdy nie umieszczaj go w APK, kodzie repozytorium ani zwykłej zmiennej.
+4. Dodaj w ustawieniach GitHub repozytorium zmienną Actions `REPORT_EMAIL_WORKER_URL`, której wartością jest pełny adres endpointu `https://<worker-host>/api/report`. Użyj hosta przypisanego przez Cloudflare, nie przykładowego placeholdera.
+5. Uruchom nową kompilację KinoStream. Aplikacja wyśle e-mail dopiero po poprawnym zapisaniu zgłoszenia w Firestore.
 
-Oficjalna dokumentacja rozszerzenia: https://firebase.google.com/docs/extensions/official/firestore-send-email. Do wysyłki wymagany jest serwer SMTP / dostawca poczty i jego dane uwierzytelniające.
+Worker ogranicza liczbę żądań do 3 na minutę z jednego adresu IP, waliduje pola i używa stałego nadawcy/odbiorcy. Ponieważ punkt końcowy aplikacji jest publiczny, limit redukuje nadużycia, ale nie zastępuje silnej weryfikacji tożsamości. Przy większej liczbie użytkowników należy dodać weryfikację Firebase App Check lub inne poświadczenie weryfikowane po stronie serwera.
+
+Resend musi potwierdzić domenę `novydev.pl`, zanim nadawca `powiadomienia@novydev.pl` będzie mógł zostać użyty. Nie trzeba tworzyć osobnej skrzynki odbiorczej dla nadawcy, ale domena musi być zweryfikowana i odpowiednio skonfigurowana przez rekordy DNS.
 
 ## 5. Alerty Crashlytics na e-mail
 
