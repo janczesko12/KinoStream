@@ -37,6 +37,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.data.PosterNetworkService
 import com.example.model.Movie
+import com.example.model.isDisplayableMetadata
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
 import com.example.ui.theme.RoyalBlue
@@ -164,51 +165,18 @@ fun MoviePosterImage(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(BadgePillShape)
-                        .background(Color.Black.copy(alpha = 0.72f))
-                        .padding(horizontal = 4.dp, vertical = 1.5.dp)
-                ) {
-                    Text(
-                        text = movie.ageRating,
-                        color = AccentCyan,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // Show the verified streaming provider directly on the cover, instead of leaving
-        // users to infer it from the card metadata. Never show a guessed/unverified provider.
-        if (showBadges && movie.isAvailabilityVerified && movie.platforms.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(
-                        start = 5.dp,
-                        bottom = if (isWatched) 22.dp else 5.dp
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PlatformBadge(
-                    platform = movie.platforms.first(),
-                    compact = true
-                )
-                val additionalPlatforms = movie.platforms.size - 1
-                if (additionalPlatforms > 0) {
+                val ageRating = movie.ageRating.trim()
+                if (ageRating.isDisplayableMetadata()) {
                     Box(
                         modifier = Modifier
                             .clip(BadgePillShape)
-                            .background(Color.Black.copy(alpha = 0.78f))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .background(Color.Black.copy(alpha = 0.72f))
+                            .padding(horizontal = 4.dp, vertical = 1.5.dp)
                     ) {
                         Text(
-                            text = "+$additionalPlatforms",
-                            color = Color.White,
-                            fontSize = 9.sp,
+                            text = ageRating,
+                            color = AccentCyan,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
