@@ -126,6 +126,7 @@ dependencies {
   implementation(libs.firebase.ai)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.crashlytics)
+  implementation(libs.firebase.auth)
   implementation(libs.kotlinx.coroutines.play.services)
 
   // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
