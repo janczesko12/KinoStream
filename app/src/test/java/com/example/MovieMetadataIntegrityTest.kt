@@ -1,12 +1,12 @@
 package com.example
 
 import com.example.data.MovieCatalog
-import com.example.data.PosterNetworkService
 import com.example.data.parseStreamingPlatform
 import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
 import com.example.model.isDisplayableMetadata
-import kotlinx.coroutines.runBlocking
+import com.example.model.isRecentReleaseDate
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,7 +65,14 @@ class MovieMetadataIntegrityTest {
     }
 
     @Test
-    fun `unverified metadata sources do not produce fabricated VOD premieres`() = runBlocking {
-        assertTrue(PosterNetworkService.fetchLatestPlatformReleases().isEmpty())
+    fun `premiere date filter accepts recent past releases only`() {
+        val today = LocalDate.of(2026, 10, 18)
+
+        assertTrue(isRecentReleaseDate("2026-10-01", today))
+        assertTrue(isRecentReleaseDate("2026-04-21", today))
+        assertFalse(isRecentReleaseDate("2026-04-20", today))
+        assertFalse(isRecentReleaseDate("2026-11-01", today))
+        assertFalse(isRecentReleaseDate("not-a-date", today))
+        assertFalse(isRecentReleaseDate(null, today))
     }
 }
