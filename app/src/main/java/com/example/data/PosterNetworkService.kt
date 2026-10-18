@@ -411,22 +411,20 @@ object PosterNetworkService {
         val apiKey = BuildConfig.TMDB_API_KEY.trim()
         if (apiKey.isBlank()) return@withContext emptyList()
 
-        val movieProviders = runCatching { fetchTmdbWatchProviders("movie", apiKey) }
-            .getOrDefault(emptyList())
-        val tvProviders = runCatching { fetchTmdbWatchProviders("tv", apiKey) }
-            .getOrDefault(emptyList())
+        val (movieProviders, tvProviders) = coroutineScope {
+            val moviesJob = async { runCatching { fetchTmdbWatchProviders("movie", apiKey) }.getOrDefault(emptyList()) }
+            val tvJob = async { runCatching { fetchTmdbWatchProviders("tv", apiKey) }.getOrDefault(emptyList()) }
+            moviesJob.await() to tvJob.await()
+        }
         if (movieProviders.isEmpty() && tvProviders.isEmpty()) return@withContext emptyList()
 
+        // Page 1 is sorted newest-first; one page per provider keeps refresh responsive.
         val queries = buildList {
             movieProviders.forEach { provider ->
-                for (page in 1..2) {
-                    add(TmdbProviderQuery("movie", provider.id, provider.platform, page, recentOnly = true))
-                }
+                add(TmdbProviderQuery("movie", provider.id, provider.platform, 1, recentOnly = true))
             }
             tvProviders.forEach { provider ->
-                for (page in 1..2) {
-                    add(TmdbProviderQuery("tv", provider.id, provider.platform, page, recentOnly = true))
-                }
+                add(TmdbProviderQuery("tv", provider.id, provider.platform, 1, recentOnly = true))
             }
         }
 
