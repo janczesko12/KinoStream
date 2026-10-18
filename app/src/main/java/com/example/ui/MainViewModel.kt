@@ -75,6 +75,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isSyncingNewReleases = MutableStateFlow(false)
     val isSyncingNewReleases: StateFlow<Boolean> = _isSyncingNewReleases.asStateFlow()
 
+    private val _isInitialLoading = MutableStateFlow(true)
+    val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
+
     private val _currentTab = MutableStateFlow(MainTab.DISCOVER)
     val currentTab: StateFlow<MainTab> = _currentTab.asStateFlow()
 
@@ -111,9 +114,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Start verified TMDB/JustWatch discovery immediately so the catalogue does not wait
         // for title/poster enrichment requests to finish.
         viewModelScope.launch {
-            repository.discoverMoreMovies()
-            // Ratings are read from Firestore independently from TMDB discovery.
-            repository.syncFilmwebRatings()
+            try {
+                repository.discoverMoreMovies()
+                // Ratings are read from Firestore independently from TMDB discovery.
+                repository.syncFilmwebRatings()
+            } finally {
+                // Avoid trapping the user on the loading screen if a request fails.
+                _isInitialLoading.value = false
+            }
         }
         viewModelScope.launch {
             repository.syncPolishStreamingTitles()

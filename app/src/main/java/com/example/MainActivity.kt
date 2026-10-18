@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +78,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(viewModel: MainViewModel) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val isInitialLoading by viewModel.isInitialLoading.collectAsStateWithLifecycle()
     val filteredMovies by viewModel.filteredMovies.collectAsStateWithLifecycle()
     val premiereMovies by viewModel.premiereMovies.collectAsStateWithLifecycle()
     val savedMovies by viewModel.savedMovies.collectAsStateWithLifecycle()
@@ -272,7 +275,9 @@ fun MainAppScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentTab) {
+            if (isInitialLoading) {
+                InitialLoadingScreen()
+            } else when (currentTab) {
                 MainTab.DISCOVER -> {
                     DiscoverScreen(
                         movies = filteredMovies,
@@ -383,5 +388,56 @@ fun MainAppScreen(viewModel: MainViewModel) {
             onToggleReminder = { viewModel.toggleReminder(movie) },
             onToggleWatchlist = { viewModel.toggleWatchlist(movie) }
         )
+    }
+}
+
+
+@Composable
+private fun InitialLoadingScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = "KinoStream",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = RoyalBlue
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Twoje kino w jednym miejscu",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(36.dp))
+            CircularProgressIndicator(
+                color = RoyalBlue,
+                strokeWidth = 3.dp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "Przygotowujemy katalog…",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Pobieramy filmy, seriale i oceny Filmweb. To może chwilę potrwać.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
