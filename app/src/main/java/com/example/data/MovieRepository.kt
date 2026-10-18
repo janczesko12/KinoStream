@@ -14,6 +14,8 @@ import org.json.JSONObject
 import com.example.ui.theme.ThemeMode
 import com.example.util.NotificationHelper
 import com.example.util.PremiereReminderScheduler
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -33,6 +35,11 @@ class MovieRepository(
 
     private val _movies = MutableStateFlow<List<Movie>>(loadCatalogWithCachedPosters())
     val movies: StateFlow<List<Movie>> = _movies.asStateFlow()
+
+    init {
+        // Reuse the last successful Firestore sync immediately; a network refresh follows in ViewModel.
+        applyFilmwebRatings()
+    }
 
     val watchlistEntries: Flow<List<WatchlistEntity>> = watchlistDao.getAllWatchlistItems()
     val watchlistMovieIdsFlow: Flow<Set<String>> = watchlistDao.getAllWatchlistIds().map { it.toSet() }
@@ -134,6 +141,60 @@ class MovieRepository(
         // Do not show speculative or outdated platform assignments while the provider API is
         // unavailable. Only previously verified TMDB/JustWatch entries are safe to display.
         return cachedProviderCatalog
+    }
+
+
+    /**
+     * Reads the central Filmweb rating cache from Firestore and overlays the values on TMDB items.
+     * Firestore document IDs are the same IDs used by the app: tmdb-movie-<id> / tmdb-tv-<id>.
+     */
+    suspend fun syncFilmwebRatings(): Int = coroutineScope {
+        val snapshot = runCatching {
+            FirebaseFirestore.getInstance()
+                .collection("filmweb_ratings")
+                .get()
+                .await()
+        }.getOrElse { return@coroutineScope 0 }
+
+        val ratings = JSONObject()
+        snapshot.documents.forEach { document ->
+            val rating = (document.get("rating") as? Number)?.toDouble() ?: 0.0
+            if (rating in 0.01..10.0) {
+                ratings.put(document.id, JSONObject().apply {
+                    put("rating", rating)
+                    put("votesCount", ((document.get("votesCount") as? Number)?.toInt() ?: 0).coerceAtLeast(0))
+                    put("filmwebUrl", document.getString("filmwebUrl") ?: "")
+                })
+            }
+        }
+
+        // Use the last successful snapshot offline and after app restarts.
+        prefs.edit()
+            .putString("filmweb_ratings_cache_v1", ratings.toString())
+            .putLong("filmweb_ratings_last_sync", System.currentTimeMillis())
+            .apply()
+        applyFilmwebRatings(ratings)
+        ratings.length()
+    }
+
+    private fun cachedFilmwebRatings(): JSONObject = runCatching {
+        JSONObject(prefs.getString("filmweb_ratings_cache_v1", "{}") ?: "{}")
+    }.getOrDefault(JSONObject())
+
+    private fun applyFilmwebRatings(ratings: JSONObject = cachedFilmwebRatings()) {
+        if (ratings.length() == 0) return
+        fun overlay(movie: Movie): Movie {
+            val item = ratings.optJSONObject(movie.id) ?: return movie
+            val rating = item.optDouble("rating", 0.0)
+            if (rating !in 0.01..10.0) return movie
+            return movie.copy(
+                filmwebRating = rating,
+                filmwebVotesCount = item.optInt("votesCount", 0).coerceAtLeast(0),
+                ratingSource = MovieRatingSource.FILMWEB
+            )
+        }
+        _movies.value = _movies.value.map(::overlay)
+        persistDiscoveredMovies(_movies.value.filter(::isOnlineDiscovery))
     }
 
     private fun normalizedProviderTitle(movie: Movie): String =
@@ -596,8 +657,15 @@ class MovieRepository(
     }
 
     private fun persistDiscoveredMovies(movies: List<Movie>) {
+        val ratings = cachedFilmwebRatings()
         val output = JSONArray()
-        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(2000).forEach { movie ->
+        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(2000).forEach { original ->
+            val ratingItem = ratings.optJSONObject(original.id)
+            val movie = if (ratingItem == null) original else original.copy(
+                filmwebRating = ratingItem.optDouble("rating", original.filmwebRating),
+                filmwebVotesCount = ratingItem.optInt("votesCount", original.filmwebVotesCount),
+                ratingSource = MovieRatingSource.FILMWEB
+            )
             val platforms = JSONArray().apply { movie.platforms.forEach { put(it.name) } }
             val cast = JSONArray().apply { movie.cast.forEach { put(it) } }
             val colors = JSONArray().apply { movie.posterGradientColors.forEach { put(it) } }
