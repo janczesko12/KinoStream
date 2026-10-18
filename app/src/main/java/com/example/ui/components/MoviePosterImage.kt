@@ -180,6 +180,42 @@ fun MoviePosterImage(
             }
         }
 
+        // Show the verified streaming provider directly on the cover, instead of leaving
+        // users to infer it from the card metadata. Never show a guessed/unverified provider.
+        if (showBadges && movie.isAvailabilityVerified && movie.platforms.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(
+                        start = 5.dp,
+                        bottom = if (isWatched) 22.dp else 5.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlatformBadge(
+                    platform = movie.platforms.first(),
+                    compact = true
+                )
+                val additionalPlatforms = movie.platforms.size - 1
+                if (additionalPlatforms > 0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(BadgePillShape)
+                            .background(Color.Black.copy(alpha = 0.78f))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "+$additionalPlatforms",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
         // Bottom watched overlay
         if (isWatched) {
             Box(
