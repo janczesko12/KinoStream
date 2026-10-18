@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schemas.cloudflare.com/wrangler/configuration.json",
+  "name": "kinostream-report-email",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-18",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "ratelimits": [
+    {
+      "name": "REPORT_RATE_LIMIT",
+      "namespace_id": "2026101801",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
+    }
+  ],
+  "secrets": {
+    "required": ["RESEND_API_KEY"]
+  }
+}
