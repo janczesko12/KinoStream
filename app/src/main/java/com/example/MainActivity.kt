@@ -64,6 +64,7 @@ import com.example.ui.screens.PremieresScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.KinoStreamTheme
 import com.example.ui.theme.RoyalBlue
+import com.example.util.CrashReporting
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        CrashReporting.initialize(this)
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -114,6 +116,11 @@ fun MainAppScreen(viewModel: MainViewModel) {
     val autoSyncedCount by viewModel.autoSyncedCount.collectAsStateWithLifecycle()
     val isSyncingNewReleases by viewModel.isSyncingNewReleases.collectAsStateWithLifecycle()
     val usePolishTitles by viewModel.usePolishTitles.collectAsStateWithLifecycle()
+    val isAdminAuthenticated by viewModel.isAdminAuthenticated.collectAsStateWithLifecycle()
+    val adminUserEmail by viewModel.adminUserEmail.collectAsStateWithLifecycle()
+    val adminReports by viewModel.problemReports.collectAsStateWithLifecycle()
+    val adminMessage by viewModel.adminMessage.collectAsStateWithLifecycle()
+    val isAdminLoading by viewModel.isAdminLoading.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -374,7 +381,16 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onAutoAddNewReleasesChange = viewModel::setAutoAddNewReleasesEnabled,
                         onSyncNewReleasesNow = viewModel::syncNewReleasesNow,
                         onUsePolishTitlesChange = viewModel::setUsePolishTitles,
-                        onSubmitProblemReport = viewModel::submitProblemReport
+                        onSubmitProblemReport = viewModel::submitProblemReport,
+                        isAdminAuthenticated = isAdminAuthenticated,
+                        adminUserEmail = adminUserEmail,
+                        adminReports = adminReports,
+                        adminMessage = adminMessage,
+                        isAdminLoading = isAdminLoading,
+                        onAdminSignIn = viewModel::signInAdmin,
+                        onAdminSignOut = viewModel::signOutAdmin,
+                        onAdminRefresh = viewModel::refreshProblemReports,
+                        onResolveProblemReport = viewModel::resolveProblemReport
                     )
                 }
             }
