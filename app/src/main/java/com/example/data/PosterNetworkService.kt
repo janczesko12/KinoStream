@@ -15,6 +15,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -400,15 +401,52 @@ object PosterNetworkService {
     }
 
     /**
-     * Automatically fetches new releases with Polish dubbing that came out on Netflix,
-     * Prime Video, Max, Disney+, and SkyShowtime.
-     */
-    /**
-     * TVMaze and Apple iTunes provide metadata, not current Polish VOD availability or dubbing.
-     * Do not classify their results as premieres until a reliable availability source is integrated.
+     * Loads recent films and series that are currently listed by supported streaming providers
+     * for Poland. Dates are the TMDB title release/first-air dates, not exact VOD launch dates.
      */
     suspend fun fetchLatestPlatformReleases(): List<Movie> = withContext(Dispatchers.IO) {
-        emptyList()
+        val apiKey = BuildConfig.TMDB_API_KEY.trim()
+        if (apiKey.isBlank()) return@withContext emptyList()
+
+        val movieProviders = runCatching { fetchTmdbWatchProviders("movie", apiKey) }
+            .getOrDefault(emptyList())
+        val tvProviders = runCatching { fetchTmdbWatchProviders("tv", apiKey) }
+            .getOrDefault(emptyList())
+        if (movieProviders.isEmpty() && tvProviders.isEmpty()) return@withContext emptyList()
+
+        val queries = buildList {
+            (movieProviders + tvProviders).forEach { provider ->
+                val mediaType = if (provider in tvProviders) "tv" else "movie"
+                for (page in 1..2) {
+                    add(TmdbProviderQuery(mediaType, provider.id, provider.platform, page, recentOnly = true))
+                }
+            }
+        }
+
+        coroutineScope {
+            val collected = mutableListOf<Movie>()
+            for (batch in queries.chunked(5)) {
+                batch.map { query ->
+                    async { runCatching { fetchTmdbProviderPage(query, apiKey) }.getOrDefault(emptyList()) }
+                }.awaitAll().forEach(collected::addAll)
+            }
+
+            val merged = LinkedHashMap<String, Movie>()
+            for (movie in collected) {
+                if (!movie.isAvailabilityVerified || movie.platforms.isEmpty()) continue
+                val current = merged[movie.id]
+                merged[movie.id] = if (current == null) {
+                    movie.copy(isPremiere = true, isUpcoming = false)
+                } else {
+                    current.copy(
+                        platforms = (current.platforms + movie.platforms).distinct(),
+                        isPremiere = true,
+                        isUpcoming = false
+                    )
+                }
+            }
+            merged.values.sortedByDescending { it.premiereDate.orEmpty() }
+        }
     }
 
     private fun fetchTvMazeWebSchedule(): List<Movie> {
@@ -577,7 +615,8 @@ object PosterNetworkService {
         val mediaType: String,
         val providerId: Int,
         val platform: StreamingPlatform,
-        val page: Int
+        val page: Int,
+        val recentOnly: Boolean = false
     )
 
     /**
@@ -689,11 +728,19 @@ object PosterNetworkService {
         apiKey: String
     ): List<Movie> {
         val path = if (query.mediaType == "tv") "tv" else "movie"
+        val today = LocalDate.now()
+        val releaseDateParameter = if (query.mediaType == "tv") "first_air_date" else "primary_release_date"
+        val dateRange = if (query.recentOnly) {
+            "&$releaseDateParameter.gte=${today.minusDays(180)}&$releaseDateParameter.lte=$today"
+        } else {
+            ""
+        }
+        val sortBy = if (query.recentOnly) "$releaseDateParameter.desc" else "popularity.desc"
         val url = "https://api.themoviedb.org/3/discover/$path" +
             "?language=pl-PL&region=PL&watch_region=PL" +
             "&with_watch_providers=${query.providerId}" +
             "&with_watch_monetization_types=flatrate%7Cfree%7Cads" +
-            "&include_adult=false&sort_by=popularity.desc&page=${query.page}"
+            "&include_adult=false&sort_by=$sortBy$dateRange&page=${query.page}"
         val request = buildTmdbRequest(url, apiKey)
 
         return client.newCall(request).execute().use { response ->
