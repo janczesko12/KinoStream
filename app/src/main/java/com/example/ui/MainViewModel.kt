@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.text.SimpleDateFormat
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 enum class MainTab(val title: String) {
     DISCOVER("Katalog"),
@@ -71,6 +74,9 @@ data class ProblemReport(
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MovieRepository(application.applicationContext)
+    private val reportEmailHttpClient = okhttp3.OkHttpClient.Builder()
+        .callTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
 
     val allMovies: StateFlow<List<Movie>> = repository.movies
     val favoriteIds: StateFlow<Set<String>> = repository.favoriteMovieIds
@@ -489,57 +495,101 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val reportContext = contextInfo.take(500)
-        val reportBody = buildString {
-            appendLine("Otrzymano nowe zgłoszenie błędu w KinoStream.")
-            appendLine()
-            appendLine("Opis:")
-            appendLine(trimmed)
-            if (reportContext.isNotBlank()) {
-                appendLine()
-                appendLine("Kontekst:")
-                appendLine(reportContext)
-            }
-            appendLine()
-            appendLine("Wersja aplikacji: ${com.example.BuildConfig.VERSION_NAME}")
-            appendLine("Urządzenie: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
-            appendLine("Android: ${android.os.Build.VERSION.RELEASE ?: "unknown"}")
-            appendLine()
-            append("Zgłoszenie jest też widoczne w panelu administratora KinoStream.")
-        }
+        val device = (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).take(200)
+        val androidVersion = android.os.Build.VERSION.RELEASE ?: "unknown"
+        val appVersion = com.example.BuildConfig.VERSION_NAME
         val payload = hashMapOf(
             "description" to trimmed,
             "context" to reportContext,
             "createdAt" to FieldValue.serverTimestamp(),
             "status" to "new",
             "app" to "KinoStream",
-            "appVersion" to com.example.BuildConfig.VERSION_NAME,
-            "device" to (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).take(200),
-            "androidVersion" to (android.os.Build.VERSION.RELEASE ?: "unknown"),
-            // Used by Firebase's Trigger Email extension when it watches problem_reports.
-            // Firestore rules pin this recipient so clients cannot email arbitrary addresses.
-            "to" to listOf("janczesko12@gmail.com"),
-            "message" to mapOf(
-                "subject" to "[KinoStream] Nowe zgłoszenie błędu",
-                "text" to reportBody
-            )
+            "appVersion" to appVersion,
+            "device" to device,
+            "androidVersion" to androidVersion
         )
         val firestore = runCatching { FirebaseFirestore.getInstance() }.getOrElse { error ->
             CrashReporting.recordNonFatal(getApplication(), error)
             _snackbarMessage.value = "Firebase nie jest skonfigurowany. Sprawdź google-services.json."
             return
         }
-        _snackbarMessage.value = "Wysyłanie zgłoszenia…"
+        _snackbarMessage.value = "Zapisywanie zgłoszenia…"
         firestore.collection("problem_reports")
             .add(payload)
-            .addOnSuccessListener {
+            .addOnSuccessListener { document ->
                 _problemReportSuccessVersion.value += 1
-                _snackbarMessage.value = "Zgłoszenie wysłane. Dziękujemy!"
+                _snackbarMessage.value = "Zgłoszenie zapisane. Wysyłanie powiadomienia e-mail…"
+                sendReportEmail(
+                    reportId = document.id,
+                    description = trimmed,
+                    contextInfo = reportContext,
+                    appVersion = appVersion,
+                    device = device,
+                    androidVersion = androidVersion
+                )
             }
             .addOnFailureListener { error ->
                 CrashReporting.recordNonFatal(getApplication(), error)
                 _snackbarMessage.value =
-                    "Nie udało się wysłać zgłoszenia. Sprawdź konfigurację Firebase i reguły Firestore."
+                    "Nie udało się zapisać zgłoszenia. Sprawdź konfigurację Firebase i reguły Firestore."
             }
+    }
+
+    private fun sendReportEmail(
+        reportId: String,
+        description: String,
+        contextInfo: String,
+        appVersion: String,
+        device: String,
+        androidVersion: String
+    ) {
+        val endpoint = com.example.BuildConfig.REPORT_EMAIL_WORKER_URL.trim()
+        if (endpoint.isBlank()) {
+            _snackbarMessage.value =
+                "Zgłoszenie zapisano w panelu Admin. Powiadomienia e-mail nie są jeszcze podłączone do tej wersji."
+            return
+        }
+        if (!endpoint.startsWith("https://")) {
+            _snackbarMessage.value =
+                "Zgłoszenie zapisano, ale adres usługi e-mail nie jest poprawnym adresem HTTPS."
+            return
+        }
+
+        val json = org.json.JSONObject()
+            .put("reportId", reportId)
+            .put("description", description)
+            .put("context", contextInfo)
+            .put("appVersion", appVersion)
+            .put("device", device)
+            .put("androidVersion", androidVersion)
+
+        val request = Request.Builder()
+            .url(endpoint)
+            .post(json.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .header("Accept", "application/json")
+            .build()
+
+        reportEmailHttpClient.newCall(request).enqueue(object : okhttp3.Callback {
+            override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+                _snackbarMessage.value =
+                    "Zgłoszenie zapisano, ale nie udało się wysłać e-maila. Zgłoszenie pozostaje w panelu Admin."
+            }
+
+            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                response.use {
+                    _snackbarMessage.value = when {
+                        it.isSuccessful ->
+                            "Zgłoszenie zapisano. Powiadomienie e-mail przyjęto do wysyłki."
+                        it.code == 429 ->
+                            "Zgłoszenie zapisano, ale limit wysyłki e-mail został chwilowo osiągnięty."
+                        it.code == 503 ->
+                            "Zgłoszenie zapisano, ale usługa e-mail nie jest jeszcze skonfigurowana."
+                        else ->
+                            "Zgłoszenie zapisano, ale e-mail nie został wysłany. Sprawdź konfigurację Cloudflare i Resend."
+                    }
+                }
+            }
+        })
     }
 
     private fun restoreAdminSession() {
