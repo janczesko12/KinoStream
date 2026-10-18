@@ -26,6 +26,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Validate Cloudflare report-email Worker source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module --check < cloudflare/kinostream-report-email/src/index.js
+          jq -e '.name == "kinostream-report-email" and .main == "src/index.js" and .ratelimits[0].name == "REPORT_RATE_LIMIT"' cloudflare/kinostream-report-email/wrangler.jsonc >/dev/null
+          echo "Cloudflare report-email Worker source and config look valid."
+
       - name: Validate TMDB API credential
         shell: bash
         run: |
