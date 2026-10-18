@@ -57,6 +57,7 @@ fun isRecentReleaseDate(
     }
     val parsedRelease = runCatching { formatter.parse(rawReleaseDate) }.getOrNull() ?: return false
     val parsedToday = runCatching { formatter.parse(today) }.getOrNull() ?: return false
+    if (formatter.format(parsedRelease) != rawReleaseDate || formatter.format(parsedToday) != today) return false
     val earliestAllowed = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.US).apply {
         time = parsedToday
         add(Calendar.DAY_OF_YEAR, -lookbackDays.coerceAtLeast(1))
