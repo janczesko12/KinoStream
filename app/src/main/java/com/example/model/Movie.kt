@@ -7,6 +7,7 @@ import com.example.ui.theme.MaxPurple
 import com.example.ui.theme.NetflixRed
 import com.example.ui.theme.PrimeVideoBlue
 import com.example.ui.theme.SkyShowtimeTeal
+import java.time.LocalDate
 
 enum class StreamingPlatform(
     val id: String,
@@ -32,6 +33,19 @@ fun String.isDisplayableMetadata(): Boolean {
         !normalized.equals("N/A", ignoreCase = true) &&
         !normalized.equals("null", ignoreCase = true) &&
         normalized != "-"
+}
+
+/**
+ * Checks a real ISO-8601 title release date against a rolling window.
+ * This is the film/series release date, not a claimed streaming-service launch date.
+ */
+fun isRecentReleaseDate(
+    releaseDate: String?,
+    today: LocalDate = LocalDate.now(),
+    lookbackDays: Long = 180
+): Boolean {
+    val parsed = releaseDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return false
+    return !parsed.isAfter(today) && !parsed.isBefore(today.minusDays(lookbackDays.coerceAtLeast(1)))
 }
 
 enum class MovieGenre(val displayName: String) {
