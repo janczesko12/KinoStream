@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.Movie
+import com.example.model.isDisplayableMetadata
 import com.example.model.MovieRatingSource
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
@@ -195,11 +196,6 @@ fun MovieDetailSheet(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            PlatformBadgesRow(
-                                platforms = if (movie.isAvailabilityVerified) movie.platforms else emptyList(),
-                                compact = false
-                            )
-
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
@@ -241,12 +237,19 @@ fun MovieDetailSheet(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        val altLabel = if (altTitle.isNotBlank() && !altTitle.equals(primaryTitle, ignoreCase = true)) {
-                            if (usePolishTitles) "Oryg.: $altTitle • " else "PL: $altTitle • "
+                        val altTitleLabel = if (altTitle.isNotBlank() && !altTitle.equals(primaryTitle, ignoreCase = true)) {
+                            if (usePolishTitles) "Oryg.: $altTitle" else "PL: $altTitle"
                         } else ""
+                        val metadataParts = buildList {
+                            if (altTitleLabel.isNotBlank()) add(altTitleLabel)
+                            add(if (movie.isAvailabilityVerified) "Polski dubbing 🇵🇱" else "Dostępność PL niepotwierdzona")
+                            if (movie.year > 0) add("${movie.year} r.")
+                            if (movie.durationMinutes > 0) add("${movie.durationMinutes} min")
+                            movie.ageRating.trim().takeIf { it.isDisplayableMetadata() }?.let(::add)
+                        }
 
                         Text(
-                            text = "${altLabel}${if (movie.isAvailabilityVerified) "Polski dubbing 🇵🇱" else "Dostępność PL niepotwierdzona"} • ${movie.year} r. • ${movie.durationMinutes} min • ${movie.ageRating}",
+                            text = metadataParts.joinToString(" • "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -489,40 +492,48 @@ fun MovieDetailSheet(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Director & Cast
-                Text(
-                    text = "Twórcy i obsada",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Reżyseria / Twórcy: ${movie.director}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = RoyalBlue
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    movie.cast.forEach { actor ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                // Show credits only when real metadata exists; never display placeholder "Brak danych".
+                val creatorName = movie.director.trim().takeIf { it.isDisplayableMetadata() }
+                val knownCast = movie.cast.filter { it.isDisplayableMetadata() }
+                if (creatorName != null || knownCast.isNotEmpty()) {
+                    Text(
+                        text = "Twórcy i obsada",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (creatorName != null) {
+                        Text(
+                            text = "Reżyseria / Twórcy: $creatorName",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = RoyalBlue
+                        )
+                    }
+                    if (knownCast.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = actor,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            knownCast.forEach { actor ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = actor,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
