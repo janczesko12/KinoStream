@@ -51,7 +51,6 @@ import com.example.model.Movie
 import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
 import com.example.ui.components.MoviePosterImage
-import com.example.ui.components.PlatformBadgesRow
 import com.example.ui.components.SupportFooterSection
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.FilmwebGreen
@@ -422,10 +421,7 @@ fun PremieresScreen(
                                         compact = true
                                     )
 
-                                    PlatformBadgesRow(
-                                        platforms = movie.platforms,
-                                        compact = true
-                                    )
+
                                 }
                             }
                         }
