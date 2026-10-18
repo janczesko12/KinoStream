@@ -90,6 +90,25 @@ jobs:
             done
           done
 
+      - name: Configure Firebase Android app
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GOOGLE_SERVICES_JSON_BASE64:-}" ]]; then
+            echo "::warning::GOOGLE_SERVICES_JSON_BASE64 is not configured. APK builds, but Firebase reporting will not connect in CI-built APKs."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+          jq -e '.project_info.project_id and (.client | length > 0)' app/google-services.json >/dev/null
+          package_name=$(jq -r '.client[0].client_info.android_client_info.package_name' app/google-services.json)
+          if [[ "$package_name" != "com.aistudio.kinostream.rvpx" ]]; then
+            echo "::error::Firebase Android package must be com.aistudio.kinostream.rvpx; found $package_name."
+            exit 1
+          fi
+          echo "Firebase Android configuration verified."
+
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
