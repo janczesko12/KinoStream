@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
@@ -60,7 +59,6 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.MovieDetailSheet
 import com.example.ui.components.AppUpdatePromptHost
 import com.example.ui.screens.DiscoverScreen
-import com.example.ui.screens.AdminPanelScreen
 import com.example.ui.screens.MyListScreen
 import com.example.ui.screens.PremieresScreen
 import com.example.ui.screens.SettingsScreen
@@ -119,11 +117,6 @@ fun MainAppScreen(viewModel: MainViewModel) {
     val autoSyncedCount by viewModel.autoSyncedCount.collectAsStateWithLifecycle()
     val isSyncingNewReleases by viewModel.isSyncingNewReleases.collectAsStateWithLifecycle()
     val usePolishTitles by viewModel.usePolishTitles.collectAsStateWithLifecycle()
-    val isAdminAuthenticated by viewModel.isAdminAuthenticated.collectAsStateWithLifecycle()
-    val adminUserEmail by viewModel.adminUserEmail.collectAsStateWithLifecycle()
-    val adminReports by viewModel.problemReports.collectAsStateWithLifecycle()
-    val adminMessage by viewModel.adminMessage.collectAsStateWithLifecycle()
-    val isAdminLoading by viewModel.isAdminLoading.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -288,33 +281,6 @@ fun MainAppScreen(viewModel: MainViewModel) {
                     )
                 )
 
-                // The Admin tab is not rendered until a Firebase administrator session is verified.
-                if (isAdminAuthenticated) {
-                    NavigationBarItem(
-                        selected = currentTab == MainTab.ADMIN,
-                        onClick = { viewModel.setTab(MainTab.ADMIN) },
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.BugReport,
-                                contentDescription = "Admin"
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = "Admin",
-                                fontSize = 11.sp,
-                                fontWeight = if (currentTab == MainTab.ADMIN) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color.White,
-                            selectedTextColor = RoyalBlue,
-                            indicatorColor = RoyalBlue,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                }
             }
             }
         }
@@ -414,28 +380,10 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onUsePolishTitlesChange = viewModel::setUsePolishTitles,
                         onSubmitProblemReport = viewModel::submitProblemReport,
                         problemReportSuccessVersion = problemReportSuccessVersion,
-                        isAdminAuthenticated = isAdminAuthenticated,
-                        adminUserEmail = adminUserEmail,
-                        adminMessage = adminMessage,
-                        isAdminLoading = isAdminLoading,
-                        onAdminSignIn = viewModel::signInAdmin,
-                        onAdminSignOut = viewModel::signOutAdmin,
-                        onOpenAdminPanel = { viewModel.setTab(MainTab.ADMIN) }
+
                     )
                 }
 
-                MainTab.ADMIN -> {
-                    AdminPanelScreen(
-                        adminUserEmail = adminUserEmail,
-                        reports = adminReports,
-                        message = adminMessage,
-                        isLoading = isAdminLoading,
-                        onRefresh = viewModel::refreshProblemReports,
-                        onSignOut = viewModel::signOutAdmin,
-                        onResolveReport = viewModel::resolveProblemReport
-                    )
-                }
-            }
             if (isInitialLoading) {
                 KinoStreamLoadingScreen(message = initialLoadingMessage)
             }
