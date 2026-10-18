@@ -15,7 +15,7 @@ Kodowanie pliku w PowerShell:
 [Convert]::ToBase64String([IO.File]::ReadAllBytes(".\app\google-services.json")) | Set-Clipboard
 ```
 
-Workflow sprawdza obecność projektu oraz identyfikator pakietu. Bez sekretu CI nadal może budować APK, ale Firebase (w tym Crashlytics i logowanie administratora) nie połączy się z projektem w APK zbudowanym przez GitHub Actions.
+Workflow sprawdza obecność projektu oraz identyfikator pakietu. Bez tego sekretu CI nadal buduje debug APK do testów, ale blokuje publikację produkcyjnego APK, żeby nie wypuścić wersji bez działającego połączenia z Firebase.
 
 ## 2. Włączenie usług Firebase
 
