@@ -17,14 +17,13 @@ Kodowanie pliku w PowerShell:
 
 Workflow sprawdza obecność projektu oraz identyfikator pakietu. Bez tego sekretu CI nadal buduje debug APK do testów, ale blokuje publikację produkcyjnego APK, żeby nie wypuścić wersji bez działającego połączenia z Firebase.
 
-## 2. Włączenie usług Firebase
+## 2. Włączenie Crashlytics
 
 W tym samym projekcie Firebase:
-- **Authentication → Sign-in method → Email/Password**: włącz logowanie e-mail/hasło.
-- Utwórz konto administratora dla adresu `janczesko12@gmail.com` w Authentication. Przy pierwszym logowaniu aplikacja sama wyśle wiadomość weryfikacyjną, jeżeli adres nie jest jeszcze potwierdzony; kliknij link w e-mailu i zaloguj się ponownie.
 - **Crashlytics**: otwórz usługę Crashlytics dla aplikacji Android. Jeżeli pojawi się kreator konfiguracji, dokończ go.
+- **Project settings → Alerts**: włącz powiadomienia e-mail o nowych awariach i ANR dla konta, które ma dostęp do projektu Firebase.
 
-Panel akceptuje tylko ten adres. To ograniczenie w interfejsie nie zastępuje zabezpieczeń po stronie Firestore — dostęp do raportów jest również sprawdzany przez reguły bazy. Jeżeli konto administratora ma inny adres, zmień go jednocześnie w `MainViewModel.kt` i `firestore.rules`.
+Aplikacja nie zawiera już panelu administratora ani logowania Firebase Authentication. E-maile o zgłoszeniach są wysyłane przez Cloudflare Worker i Resend, niezależnie od panelu w aplikacji. Samo usunięcie panelu nie zmienia zasad zapisu zgłoszeń ani działania Crashlytics.
 
 ## 3. Reguły bezpieczeństwa Firestore
 
