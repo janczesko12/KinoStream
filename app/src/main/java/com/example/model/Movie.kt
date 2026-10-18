@@ -21,6 +21,19 @@ enum class StreamingPlatform(
     SKYSHOWTIME("skyshowtime", "SkyShowtime", SkyShowtimeTeal, "SKY")
 }
 
+/**
+ * Returns false for blank or placeholder metadata that must not be presented as real data.
+ */
+fun String.isDisplayableMetadata(): Boolean {
+    val normalized = trim()
+    return normalized.isNotEmpty() &&
+        !normalized.equals("Brak danych", ignoreCase = true) &&
+        !normalized.equals("Unknown", ignoreCase = true) &&
+        !normalized.equals("N/A", ignoreCase = true) &&
+        !normalized.equals("null", ignoreCase = true) &&
+        normalized != "-"
+}
+
 enum class MovieGenre(val displayName: String) {
     WSZYSTKIE("Wszystkie"),
     AKCJA("Akcja"),
