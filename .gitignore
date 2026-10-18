@@ -19,3 +19,6 @@ debug.keystore
 
 # Firebase client configuration (supply locally or through GitHub Actions secret)
 app/google-services.json
+
+# Local-only secrets for the Cloudflare report-email Worker
+cloudflare/kinostream-report-email/.dev.vars
