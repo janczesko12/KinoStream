@@ -15,7 +15,10 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -732,10 +735,16 @@ object PosterNetworkService {
         apiKey: String
     ): List<Movie> {
         val path = if (query.mediaType == "tv") "tv" else "movie"
-        val today = LocalDate.now()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val todayCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.US)
+        val today = dateFormat.format(todayCalendar.time)
+        todayCalendar.add(Calendar.DAY_OF_YEAR, -180)
+        val earliestDate = dateFormat.format(todayCalendar.time)
         val releaseDateParameter = if (query.mediaType == "tv") "first_air_date" else "primary_release_date"
         val dateRange = if (query.recentOnly) {
-            "&$releaseDateParameter.gte=${today.minusDays(180)}&$releaseDateParameter.lte=$today"
+            "&$releaseDateParameter.gte=$earliestDate&$releaseDateParameter.lte=$today"
         } else {
             ""
         }
