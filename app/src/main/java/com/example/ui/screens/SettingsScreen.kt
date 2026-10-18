@@ -69,7 +69,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.StreamingPlatform
 import com.example.ui.components.FilmwebRatingBadge
-import com.example.ui.ProblemReport
 import com.example.ui.components.AppUpdateSection
 import com.example.ui.components.SupportFooterSection
 import com.example.ui.theme.AccentCyan
@@ -103,13 +102,11 @@ fun SettingsScreen(
     problemReportSuccessVersion: Int = 0,
     isAdminAuthenticated: Boolean = false,
     adminUserEmail: String? = null,
-    adminReports: List<ProblemReport> = emptyList(),
     adminMessage: String? = null,
     isAdminLoading: Boolean = false,
     onAdminSignIn: (String, String) -> Unit = { _, _ -> },
     onAdminSignOut: () -> Unit = {},
-    onAdminRefresh: () -> Unit = {},
-    onResolveProblemReport: (String) -> Unit = {},
+    onOpenAdminPanel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -1081,78 +1078,21 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = onAdminRefresh, enabled = !isAdminLoading) {
-                                Text("Odśwież")
-                            }
-                            OutlinedButton(onClick = onAdminSignOut) {
-                                Text("Wyloguj")
-                            }
+                        Button(
+                            onClick = onOpenAdminPanel,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Otwórz kartę Admin", fontWeight = FontWeight.Bold)
                         }
-                        if (isAdminLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = RoyalBlue)
-                        }
-                        if (adminReports.isEmpty()) {
-                            Text(
-                                "Brak zgłoszeń do wyświetlenia.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            adminReports.forEach { report ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = when (report.status) {
-                                                    "resolved" -> "ROZWIĄZANE"
-                                                    "in_progress" -> "W TRAKCIE"
-                                                    else -> "NOWE"
-                                                },
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (report.status == "resolved") FilmwebGreen else RoyalBlue
-                                            )
-                                            Spacer(modifier = Modifier.weight(1f))
-                                            Text(
-                                                report.createdAt,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        Text(report.description, style = MaterialTheme.typography.bodyMedium)
-                                        Text(
-                                            "${report.device} • Android ${report.androidVersion} • KinoStream ${report.appVersion}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (report.context.isNotBlank()) {
-                                            Text(
-                                                report.context,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        if (report.status != "resolved") {
-                                            OutlinedButton(
-                                                onClick = { onResolveProblemReport(report.id) },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text("Oznacz jako rozwiązane")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        OutlinedButton(
+                            onClick = onAdminSignOut,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Wyloguj administratora")
                         }
                     } else {
                         Text(
