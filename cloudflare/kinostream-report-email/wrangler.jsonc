@@ -16,8 +16,5 @@
         "period": 60
       }
     }
-  ],
-  "secrets": {
-    "required": ["RESEND_API_KEY"]
-  }
+  ]
 }
