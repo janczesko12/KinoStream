@@ -153,6 +153,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
 
+                        // Save all verified Firebase/provider metadata on-device after a successful refresh.
+                        repository.persistFullCatalogSnapshot()
                         _initialLoadingMessage.value = "Gotowe! Otwieramy katalog…"
                     }
                 }

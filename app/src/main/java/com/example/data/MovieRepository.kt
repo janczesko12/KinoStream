@@ -120,6 +120,11 @@ class MovieRepository(
     val usePolishTitles: StateFlow<Boolean> = _usePolishTitles.asStateFlow()
 
     private fun loadCatalogWithCachedPosters(): List<Movie> {
+        // Prefer the complete local snapshot so app launches can render without waiting for Firebase/TMDB.
+        val fullSnapshot = loadDiscoveredMovies("full_catalog_snapshot_v1")
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
+        if (fullSnapshot.isNotEmpty()) return fullSnapshot.distinctBy { it.id }
+
         // Never trust hard-coded platform labels. On a fresh install the verified online catalogue
         // is populated asynchronously by discoverMoreMovies(); keep the initial list empty rather
         // than showing incorrect VOD providers.
@@ -664,9 +669,9 @@ class MovieRepository(
     private fun isOnlineDiscovery(movie: Movie): Boolean =
         movie.id.startsWith("tvmaze-") || movie.id.startsWith("itunes-") || movie.id.startsWith("auto-tvmaze-") || movie.id.startsWith("tmdb-movie-") || movie.id.startsWith("tmdb-tv-")
 
-    private fun loadDiscoveredMovies(): List<Movie> {
+    private fun loadDiscoveredMovies(cacheKey: String = "discovered_movies_json"): List<Movie> {
         return try {
-            val json = JSONArray(prefs.getString("discovered_movies_json", "[]"))
+            val json = JSONArray(prefs.getString(cacheKey, "[]"))
             (0 until json.length()).mapNotNull { index ->
                 val item = json.optJSONObject(index) ?: return@mapNotNull null
                 runCatching {
@@ -718,10 +723,10 @@ class MovieRepository(
         }
     }
 
-    private fun persistDiscoveredMovies(movies: List<Movie>) {
+    private fun persistDiscoveredMovies(movies: List<Movie>, includeAll: Boolean = false) {
         val ratings = cachedFilmwebRatings()
         val output = JSONArray()
-        movies.filter(::isOnlineDiscovery).distinctBy { it.id }.takeLast(2000).forEach { original ->
+        movies.filter { includeAll || isOnlineDiscovery(it) }.distinctBy { it.id }.takeLast(2000).forEach { original ->
             val ratingItem = ratings.optJSONObject(original.id)
             val movie = if (ratingItem == null) original else original.copy(
                 filmwebRating = ratingItem.optDouble("rating", original.filmwebRating),
@@ -762,6 +767,26 @@ class MovieRepository(
             })
         }
         prefs.edit().putString("discovered_movies_json", output.toString()).apply()
+    }
+
+
+    /**
+     * Persist the complete, currently verified catalogue on the device. The next process start
+     * reads this snapshot synchronously; network refresh methods run only when their 48h TTL expires.
+     */
+    fun persistFullCatalogSnapshot() {
+        val current = _movies.value
+            .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
+            .distinctBy { it.id }
+        if (current.isNotEmpty()) {
+            persistDiscoveredMovies(current, includeAll = true)
+            // Keep a dedicated snapshot separate from the incremental online-discovery cache.
+            val snapshot = prefs.getString("discovered_movies_json", "[]") ?: "[]"
+            prefs.edit()
+                .putString("full_catalog_snapshot_v1", snapshot)
+                .putLong("full_catalog_snapshot_saved_at", System.currentTimeMillis())
+                .apply()
+        }
     }
 
     private fun loadStringSet(key: String): Set<String> {
