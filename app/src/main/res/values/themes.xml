@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <!-- Explicit launch/window colors prevent Android's DeviceDefault theme from showing
+         its brown/tan fallback before Jetpack Compose draws the branded loading screen. -->
+    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#0A0F1D</item>
+        <item name="android:colorAccent">#1E88E5</item>
+        <item name="android:statusBarColor">#0A0F1D</item>
+        <item name="android:navigationBarColor">#0A0F1D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>
