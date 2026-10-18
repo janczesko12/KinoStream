@@ -36,7 +36,7 @@ Przed wdrożeniem przejrzyj reguły obecnie działające w Firebase Console. **N
 
 ## 4. Jak działa raportowanie
 
-- Zgłoszenia pojawiają się w **Ustawienia → Panel administratora** po zalogowaniu i są aktualizowane w czasie rzeczywistym.
+- Użytkownik wysyła zgłoszenie przez **Ustawienia → Zgłoś problem**. Po zalogowaniu administratorowi pojawia się osobna karta **Admin** w dolnym menu; lista aktualizuje się w czasie rzeczywistym.
 - Można oznaczyć zgłoszenie jako rozwiązane. Historia nie jest usuwana z panelu.
 - Crashlytics automatycznie zbiera awarie aplikacji oraz ANR, jeśli Firebase jest poprawnie skonfigurowany. Kod dodaje też wersję aplikacji i informacje o urządzeniu jako klucze raportu, nie zapisuje adresu e-mail użytkownika jako identyfikatora Crashlytics.
 - Błędy zgłoszeń i logowania, które da się obsłużyć, są rejestrowane jako błędy niefatalne, gdy Firebase jest dostępny.
