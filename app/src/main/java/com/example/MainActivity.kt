@@ -100,6 +100,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val selectedMovie by viewModel.selectedMovie.collectAsStateWithLifecycle()
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
+    val problemReportSuccessVersion by viewModel.problemReportSuccessVersion.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedPlatform by viewModel.selectedPlatform.collectAsStateWithLifecycle()
     val contentTypeFilter by viewModel.contentTypeFilter.collectAsStateWithLifecycle()
@@ -382,6 +383,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onSyncNewReleasesNow = viewModel::syncNewReleasesNow,
                         onUsePolishTitlesChange = viewModel::setUsePolishTitles,
                         onSubmitProblemReport = viewModel::submitProblemReport,
+                        problemReportSuccessVersion = problemReportSuccessVersion,
                         isAdminAuthenticated = isAdminAuthenticated,
                         adminUserEmail = adminUserEmail,
                         adminReports = adminReports,
