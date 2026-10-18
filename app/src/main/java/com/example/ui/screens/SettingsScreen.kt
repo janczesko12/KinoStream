@@ -39,7 +39,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -64,7 +63,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.StreamingPlatform
@@ -100,13 +98,6 @@ fun SettingsScreen(
     onUsePolishTitlesChange: (Boolean) -> Unit = {},
     onSubmitProblemReport: (String, String) -> Unit = { _, _ -> },
     problemReportSuccessVersion: Int = 0,
-    isAdminAuthenticated: Boolean = false,
-    adminUserEmail: String? = null,
-    adminMessage: String? = null,
-    isAdminLoading: Boolean = false,
-    onAdminSignIn: (String, String) -> Unit = { _, _ -> },
-    onAdminSignOut: () -> Unit = {},
-    onOpenAdminPanel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -121,8 +112,6 @@ fun SettingsScreen(
     var maxInputText by remember { mutableStateOf(String.format(Locale.US, "%.1f", maxFilmwebRating)) }
     var inputError by remember { mutableStateOf<String?>(null) }
     var problemReportText by remember { mutableStateOf("") }
-    var adminEmailInput by remember { mutableStateOf("janczesko12@gmail.com") }
-    var adminPasswordInput by remember { mutableStateOf("") }
 
     LaunchedEffect(problemReportSuccessVersion) {
         if (problemReportSuccessVersion > 0) problemReportText = ""
@@ -1046,107 +1035,6 @@ fun SettingsScreen(
                         Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Wyślij zgłoszenie", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // Admin panel: authentication is checked again by Firestore security rules.
-        item {
-            Card(
-                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                border = CardDefaults.outlinedCardBorder()
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Filled.BugReport, contentDescription = null, tint = RoyalBlue, modifier = Modifier.size(22.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Panel administratora", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                "Prywatna lista zgłoszeń użytkowników",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    if (isAdminAuthenticated) {
-                        Text(
-                            text = "Zalogowano: ${adminUserEmail ?: "administrator"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button(
-                            onClick = onOpenAdminPanel,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Otwórz kartę Admin", fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = onAdminSignOut,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Wyloguj administratora")
-                        }
-                    } else {
-                        Text(
-                            "Logowanie jest dostępne wyłącznie dla skonfigurowanego, zweryfikowanego konta administratora.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedTextField(
-                            value = adminEmailInput,
-                            onValueChange = { adminEmailInput = it },
-                            modifier = Modifier.fillMaxWidth().testTag("field_admin_email"),
-                            label = { Text("E-mail administratora") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                        )
-                        OutlinedTextField(
-                            value = adminPasswordInput,
-                            onValueChange = { adminPasswordInput = it },
-                            modifier = Modifier.fillMaxWidth().testTag("field_admin_password"),
-                            label = { Text("Hasło") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                        )
-                        Button(
-                            onClick = { onAdminSignIn(adminEmailInput, adminPasswordInput) },
-                            enabled = !isAdminLoading && adminEmailInput.isNotBlank() && adminPasswordInput.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth().testTag("btn_admin_sign_in"),
-                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            if (isAdminLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text("Zaloguj do panelu", fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    adminMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (
-                                message.contains("nie udało", ignoreCase = true) ||
-                                message.contains("brak", ignoreCase = true) ||
-                                message.contains("nie jest", ignoreCase = true) ||
-                                message.contains("sprawdź", ignoreCase = true)
-                            ) FilmwebRed else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
