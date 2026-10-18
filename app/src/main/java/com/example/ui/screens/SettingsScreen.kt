@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
@@ -95,6 +96,7 @@ fun SettingsScreen(
     onAutoAddNewReleasesChange: (Boolean) -> Unit = {},
     onSyncNewReleasesNow: () -> Unit = {},
     onUsePolishTitlesChange: (Boolean) -> Unit = {},
+    onSubmitProblemReport: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -108,6 +110,7 @@ fun SettingsScreen(
     var minInputText by remember { mutableStateOf(String.format(Locale.US, "%.1f", minFilmwebRating)) }
     var maxInputText by remember { mutableStateOf(String.format(Locale.US, "%.1f", maxFilmwebRating)) }
     var inputError by remember { mutableStateOf<String?>(null) }
+    var problemReportText by remember { mutableStateOf("") }
 
     LaunchedEffect(minFilmwebRating, maxFilmwebRating) {
         minInputText = String.format(Locale.US, "%.1f", minFilmwebRating)
@@ -983,6 +986,51 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+            }
+        }
+
+
+        item {
+            Card(
+                modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.BugReport, contentDescription = null, tint = RoyalBlue, modifier = Modifier.size(22.dp))
+                        Column {
+                            Text("Zgłoś problem", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Zgłoś błąd aplikacji — funkcja pomocnicza.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = problemReportText,
+                        onValueChange = { problemReportText = it },
+                        modifier = Modifier.fillMaxWidth().testTag("field_problem_report"),
+                        label = { Text("Opis problemu") },
+                        placeholder = { Text("Co nie działa?") },
+                        minLines = 3,
+                        maxLines = 5
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            onSubmitProblemReport(problemReportText, "Android " + Build.VERSION.RELEASE + "; " + Build.MANUFACTURER + " " + Build.MODEL)
+                            problemReportText = ""
+                        },
+                        enabled = problemReportText.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().testTag("btn_submit_problem_report"),
+                        colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Wyślij zgłoszenie", fontWeight = FontWeight.Bold)
                     }
                 }
             }
