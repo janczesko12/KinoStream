@@ -21,7 +21,7 @@ Workflow sprawdza obecność projektu oraz identyfikator pakietu. Bez sekretu CI
 
 W tym samym projekcie Firebase:
 - **Authentication → Sign-in method → Email/Password**: włącz logowanie e-mail/hasło.
-- Utwórz konto administratora dla adresu `janczesko12@gmail.com` i potwierdź ten adres e-mail.
+- Utwórz konto administratora dla adresu `janczesko12@gmail.com` w Authentication. Przy pierwszym logowaniu aplikacja sama wyśle wiadomość weryfikacyjną, jeżeli adres nie jest jeszcze potwierdzony; kliknij link w e-mailu i zaloguj się ponownie.
 - **Crashlytics**: otwórz usługę Crashlytics dla aplikacji Android. Jeżeli pojawi się kreator konfiguracji, dokończ go.
 
 Panel akceptuje tylko ten adres. To ograniczenie w interfejsie nie zastępuje zabezpieczeń po stronie Firestore — dostęp do raportów jest również sprawdzany przez reguły bazy. Jeżeli konto administratora ma inny adres, zmień go jednocześnie w `MainViewModel.kt` i `firestore.rules`.
