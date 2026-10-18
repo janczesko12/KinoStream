@@ -6,7 +6,6 @@ import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
 import com.example.model.isDisplayableMetadata
 import com.example.model.isRecentReleaseDate
-import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -66,7 +65,7 @@ class MovieMetadataIntegrityTest {
 
     @Test
     fun `premiere date filter accepts recent past releases only`() {
-        val today = LocalDate.of(2026, 10, 18)
+        val today = "2026-10-18"
 
         assertTrue(isRecentReleaseDate("2026-10-01", today))
         assertTrue(isRecentReleaseDate("2026-04-21", today))
