@@ -6,11 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.MovieRepository
 import com.example.util.CrashReporting
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
 import com.example.model.ContentTypeFilter
 import com.example.model.Movie
 import com.example.model.MovieGenre
@@ -30,8 +27,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Locale
-import java.text.SimpleDateFormat
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -40,8 +35,7 @@ enum class MainTab(val title: String) {
     DISCOVER("Katalog"),
     PREMIERES("Premiery"),
     MY_LIST("Moja Lista"),
-    SETTINGS("Ustawienia"),
-    ADMIN("Admin")
+    SETTINGS("Ustawienia")
 }
 
 enum class MyListFilter(val label: String) {
@@ -58,18 +52,6 @@ data class UiStats(
     val watchlistCount: Int = 0,
     val averageWatchedRating: Double = 0.0,
     val totalWatchedMinutes: Int = 0
-)
-
-@Immutable
-data class ProblemReport(
-    val id: String,
-    val description: String,
-    val context: String,
-    val appVersion: String,
-    val device: String,
-    val androidVersion: String,
-    val status: String,
-    val createdAt: String
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -139,23 +121,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _problemReportSuccessVersion = MutableStateFlow(0)
     val problemReportSuccessVersion: StateFlow<Int> = _problemReportSuccessVersion.asStateFlow()
 
-    private val adminAllowedEmail = "janczesko12@gmail.com"
-    private val _isAdminAuthenticated = MutableStateFlow(false)
-    val isAdminAuthenticated: StateFlow<Boolean> = _isAdminAuthenticated.asStateFlow()
-    private val _adminUserEmail = MutableStateFlow<String?>(null)
-    val adminUserEmail: StateFlow<String?> = _adminUserEmail.asStateFlow()
-    private val _problemReports = MutableStateFlow<List<ProblemReport>>(emptyList())
-    val problemReports: StateFlow<List<ProblemReport>> = _problemReports.asStateFlow()
-    private val _adminMessage = MutableStateFlow<String?>(null)
-    val adminMessage: StateFlow<String?> = _adminMessage.asStateFlow()
-    private val _isAdminLoading = MutableStateFlow(false)
-    val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
-    private var problemReportsRegistration: ListenerRegistration? = null
-
     private var onlineSearchJob: Job? = null
 
     init {
-        restoreAdminSession()
         viewModelScope.launch {
             try {
                 // Show a real loading screen while the startup data stages are running.
@@ -546,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val endpoint = com.example.BuildConfig.REPORT_EMAIL_WORKER_URL.trim()
         if (endpoint.isBlank()) {
             _snackbarMessage.value =
-                "Zgłoszenie zapisano w panelu Admin. Powiadomienia e-mail nie są jeszcze podłączone do tej wersji."
+                "Zgłoszenie zapisano, ale powiadomienia e-mail nie są jeszcze podłączone do tej wersji."
             return
         }
         if (!endpoint.startsWith("https://")) {
@@ -572,7 +540,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reportEmailHttpClient.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
                 _snackbarMessage.value =
-                    "Zgłoszenie zapisano, ale nie udało się wysłać e-maila. Zgłoszenie pozostaje w panelu Admin."
+                    "Zgłoszenie zapisano, ale nie udało się wysłać e-maila. Zgłoszenie pozostaje zapisane w bazie."
             }
 
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
@@ -590,153 +558,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         })
-    }
-
-    private fun restoreAdminSession() {
-        val user = runCatching { FirebaseAuth.getInstance().currentUser }.getOrNull()
-        if (user?.email?.equals(adminAllowedEmail, ignoreCase = true) == true && user.isEmailVerified) {
-            _isAdminAuthenticated.value = true
-            _adminUserEmail.value = user.email
-            listenForProblemReports()
-        }
-    }
-
-    fun signInAdmin(email: String, password: String) {
-        val normalizedEmail = email.trim()
-        if (!normalizedEmail.equals(adminAllowedEmail, ignoreCase = true)) {
-            _adminMessage.value = "Ten adres nie ma dostępu do panelu administratora."
-            return
-        }
-        if (password.isBlank()) {
-            _adminMessage.value = "Wpisz hasło administratora."
-            return
-        }
-
-        _isAdminLoading.value = true
-        _adminMessage.value = null
-        val auth = runCatching { FirebaseAuth.getInstance() }.getOrElse { error ->
-            _isAdminLoading.value = false
-            _adminMessage.value = "Brak konfiguracji Firebase. Dodaj google-services.json."
-            CrashReporting.recordNonFatal(getApplication(), error)
-            return
-        }
-        auth.signInWithEmailAndPassword(normalizedEmail, password)
-            .addOnSuccessListener { result ->
-                val user = result.user
-                if (user?.email?.equals(adminAllowedEmail, ignoreCase = true) != true) {
-                    auth.signOut()
-                    _isAdminAuthenticated.value = false
-                    _adminMessage.value = "To konto nie jest kontem administratora."
-                } else if (!user.isEmailVerified) {
-                    _isAdminAuthenticated.value = false
-                    _adminMessage.value = "Wysyłanie linku potwierdzającego adres e-mail…"
-                    user.sendEmailVerification()
-                        .addOnSuccessListener {
-                            auth.signOut()
-                            _isAdminLoading.value = false
-                            _adminMessage.value = "Wysłaliśmy link potwierdzający. Otwórz wiadomość e-mail, potwierdź adres i zaloguj się ponownie."
-                        }
-                        .addOnFailureListener { error ->
-                            auth.signOut()
-                            _isAdminLoading.value = false
-                            _adminMessage.value = "Nie udało się wysłać wiadomości weryfikacyjnej. Sprawdź ustawienia szablonów e-mail w Firebase."
-                            CrashReporting.recordNonFatal(getApplication(), error)
-                        }
-                    return@addOnSuccessListener
-                } else {
-                    _isAdminAuthenticated.value = true
-                    _adminUserEmail.value = user.email
-                    _adminMessage.value = null
-                    listenForProblemReports()
-                    setTab(MainTab.ADMIN)
-                }
-                _isAdminLoading.value = false
-            }
-            .addOnFailureListener { error ->
-                _isAdminLoading.value = false
-                _adminMessage.value = "Logowanie nieudane. Sprawdź hasło i włączenie logowania e-mail/hasło w Firebase."
-                CrashReporting.recordNonFatal(getApplication(), error)
-            }
-    }
-
-    fun signOutAdmin() {
-        problemReportsRegistration?.remove()
-        problemReportsRegistration = null
-        runCatching { FirebaseAuth.getInstance().signOut() }
-        _isAdminAuthenticated.value = false
-        _adminUserEmail.value = null
-        _problemReports.value = emptyList()
-        _adminMessage.value = null
-        _isAdminLoading.value = false
-        setTab(MainTab.SETTINGS)
-    }
-
-    fun refreshProblemReports() {
-        if (!_isAdminAuthenticated.value) return
-        _adminMessage.value = null
-        listenForProblemReports()
-    }
-
-    private fun listenForProblemReports() {
-        if (!_isAdminAuthenticated.value) return
-        problemReportsRegistration?.remove()
-        val firestore = runCatching { FirebaseFirestore.getInstance() }.getOrElse { error ->
-            _adminMessage.value = "Nie można połączyć z Firestore. Sprawdź konfigurację Firebase."
-            CrashReporting.recordNonFatal(getApplication(), error)
-            return
-        }
-        problemReportsRegistration = firestore.collection("problem_reports")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(100)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    _adminMessage.value = "Brak dostępu do zgłoszeń. Sprawdź reguły Firestore i konto administratora."
-                    CrashReporting.recordNonFatal(getApplication(), error)
-                    return@addSnapshotListener
-                }
-                _problemReports.value = snapshot?.documents.orEmpty().map { document ->
-                    val createdAt = document.getTimestamp("createdAt")?.toDate()?.let { date ->
-                        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(date)
-                    } ?: "Przed chwilą"
-                    ProblemReport(
-                        id = document.id,
-                        description = document.getString("description").orEmpty(),
-                        context = document.getString("context").orEmpty(),
-                        appVersion = document.getString("appVersion").orEmpty(),
-                        device = document.getString("device").orEmpty(),
-                        androidVersion = document.getString("androidVersion").orEmpty(),
-                        status = document.getString("status") ?: "new",
-                        createdAt = createdAt
-                    )
-                }
-            }
-    }
-
-    fun resolveProblemReport(reportId: String) {
-        if (!_isAdminAuthenticated.value) {
-            _adminMessage.value = "Zaloguj się jako administrator."
-            return
-        }
-        FirebaseFirestore.getInstance()
-            .collection("problem_reports")
-            .document(reportId)
-            .update(
-                mapOf(
-                    "status" to "resolved",
-                    "resolvedAt" to FieldValue.serverTimestamp()
-                )
-            )
-            .addOnSuccessListener { _adminMessage.value = "Zgłoszenie oznaczono jako rozwiązane." }
-            .addOnFailureListener { error ->
-                _adminMessage.value = "Nie udało się zmienić statusu zgłoszenia."
-                CrashReporting.recordNonFatal(getApplication(), error)
-            }
-    }
-
-    override fun onCleared() {
-        problemReportsRegistration?.remove()
-        problemReportsRegistration = null
-        super.onCleared()
     }
 
     fun clearSnackbar() {
