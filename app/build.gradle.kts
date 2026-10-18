@@ -42,7 +42,7 @@ android {
     buildConfigField(
       "String",
       "REPORT_EMAIL_WORKER_URL",
-      "\"\u0024{escapedReportEmailWorkerUrl}\""
+      "\"${escapedReportEmailWorkerUrl}\""
     )
   }
 
