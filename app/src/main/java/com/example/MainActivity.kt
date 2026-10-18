@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,6 +76,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppScreen(viewModel: MainViewModel) {
+    val isInitialLoading by viewModel.isInitialLoading.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val filteredMovies by viewModel.filteredMovies.collectAsStateWithLifecycle()
     val premiereMovies by viewModel.premiereMovies.collectAsStateWithLifecycle()
@@ -359,15 +361,23 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onFilmwebRatingRangeChange = viewModel::setFilmwebRatingRange,
                         onAutoAddNewReleasesChange = viewModel::setAutoAddNewReleasesEnabled,
                         onSyncNewReleasesNow = viewModel::syncNewReleasesNow,
-                        onUsePolishTitlesChange = viewModel::setUsePolishTitles
+                        onUsePolishTitlesChange = viewModel::setUsePolishTitles,
+                        onSubmitProblemReport = viewModel::submitProblemReport
                     )
                 }
+            }
+            if (isInitialLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF8B5A2B))
+                )
             }
         }
     }
 
     // Modal detail sheet
-    selectedMovie?.let { movie ->
+    if (!isInitialLoading) selectedMovie?.let { movie ->
         MovieDetailSheet(
             movie = movie,
             isFavorite = favoriteIds.contains(movie.id),
