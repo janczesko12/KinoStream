@@ -112,6 +112,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // for title/poster enrichment requests to finish.
         viewModelScope.launch {
             repository.discoverMoreMovies()
+            // Ratings are read from Firestore independently from TMDB discovery.
+            repository.syncFilmwebRatings()
         }
         viewModelScope.launch {
             repository.syncPolishStreamingTitles()
