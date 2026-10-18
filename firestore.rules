@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isKinoStreamAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'janczesko12@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    // The app reads centrally curated Filmweb scores. Clients must not edit the shared cache.
+    match /filmweb_ratings/{ratingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Reports can be submitted without an account. Only the verified admin can read or triage.
+    match /problem_reports/{reportId} {
+      allow create: if request.resource.data.keys().hasAll([
+          'description', 'context', 'createdAt', 'status', 'app',
+          'appVersion', 'device', 'androidVersion'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'description', 'context', 'createdAt', 'status', 'app',
+          'appVersion', 'device', 'androidVersion'
+        ])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 3000
+        && request.resource.data.context is string
+        && request.resource.data.context.size() <= 500
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.status == 'new'
+        && request.resource.data.app == 'KinoStream'
+        && request.resource.data.appVersion is string
+        && request.resource.data.device is string
+        && request.resource.data.androidVersion is string;
+
+      allow read: if isKinoStreamAdmin();
+
+      allow update: if isKinoStreamAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resolvedAt'])
+        && request.resource.data.status in ['new', 'in_progress', 'resolved']
+        && (
+          !request.resource.data.keys().hasAny(['resolvedAt'])
+          || request.resource.data.resolvedAt == request.time
+        );
+
+      // Keep the report history. Do not permanently delete reports from the client.
+      allow delete: if false;
+    }
+  }
+}
