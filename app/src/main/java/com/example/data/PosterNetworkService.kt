@@ -415,10 +415,14 @@ object PosterNetworkService {
         if (movieProviders.isEmpty() && tvProviders.isEmpty()) return@withContext emptyList()
 
         val queries = buildList {
-            (movieProviders + tvProviders).forEach { provider ->
-                val mediaType = if (provider in tvProviders) "tv" else "movie"
+            movieProviders.forEach { provider ->
                 for (page in 1..2) {
-                    add(TmdbProviderQuery(mediaType, provider.id, provider.platform, page, recentOnly = true))
+                    add(TmdbProviderQuery("movie", provider.id, provider.platform, page, recentOnly = true))
+                }
+            }
+            tvProviders.forEach { provider ->
+                for (page in 1..2) {
+                    add(TmdbProviderQuery("tv", provider.id, provider.platform, page, recentOnly = true))
                 }
             }
         }
