@@ -100,6 +100,7 @@ fun SettingsScreen(
     onSyncNewReleasesNow: () -> Unit = {},
     onUsePolishTitlesChange: (Boolean) -> Unit = {},
     onSubmitProblemReport: (String, String) -> Unit = { _, _ -> },
+    problemReportSuccessVersion: Int = 0,
     isAdminAuthenticated: Boolean = false,
     adminUserEmail: String? = null,
     adminReports: List<ProblemReport> = emptyList(),
@@ -125,6 +126,10 @@ fun SettingsScreen(
     var problemReportText by remember { mutableStateOf("") }
     var adminEmailInput by remember { mutableStateOf("janczesko12@gmail.com") }
     var adminPasswordInput by remember { mutableStateOf("") }
+
+    LaunchedEffect(problemReportSuccessVersion) {
+        if (problemReportSuccessVersion > 0) problemReportText = ""
+    }
 
     LaunchedEffect(minFilmwebRating, maxFilmwebRating) {
         minInputText = String.format(Locale.US, "%.1f", minFilmwebRating)
@@ -1035,7 +1040,6 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             onSubmitProblemReport(problemReportText, "Android " + Build.VERSION.RELEASE + "; " + Build.MANUFACTURER + " " + Build.MODEL)
-                            problemReportText = ""
                         },
                         enabled = problemReportText.isNotBlank(),
                         modifier = Modifier.fillMaxWidth().testTag("btn_submit_problem_report"),
