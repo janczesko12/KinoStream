@@ -16,7 +16,7 @@ object CrashReporting {
             .getOrNull() ?: return
 
         runCatching {
-            FirebaseCrashlytics.getInstance(app).apply {
+            FirebaseCrashlytics.getInstance().apply {
                 setCrashlyticsCollectionEnabled(true)
                 setCustomKey("app_name", "KinoStream")
                 setCustomKey("app_version", BuildConfig.VERSION_NAME)
@@ -29,10 +29,11 @@ object CrashReporting {
 
     fun recordNonFatal(context: Context, error: Throwable) {
         runCatching {
-            val app = FirebaseApp.getApps(context.applicationContext)
-                .firstOrNull { it.name == FirebaseApp.DEFAULT_APP_NAME }
-                ?: return
-            FirebaseCrashlytics.getInstance(app).recordException(error)
+            val hasDefaultApp = FirebaseApp.getApps(context.applicationContext)
+                .any { it.name == FirebaseApp.DEFAULT_APP_NAME }
+            if (hasDefaultApp) {
+                FirebaseCrashlytics.getInstance().recordException(error)
+            }
         }
     }
 }
