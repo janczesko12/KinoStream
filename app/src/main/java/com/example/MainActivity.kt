@@ -7,7 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
@@ -25,6 +31,8 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -38,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -77,6 +86,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppScreen(viewModel: MainViewModel) {
     val isInitialLoading by viewModel.isInitialLoading.collectAsStateWithLifecycle()
+    val initialLoadingMessage by viewModel.initialLoadingMessage.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val filteredMovies by viewModel.filteredMovies.collectAsStateWithLifecycle()
     val premiereMovies by viewModel.premiereMovies.collectAsStateWithLifecycle()
@@ -128,6 +138,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
+            if (!isInitialLoading) {
             NavigationBar(
                 modifier = Modifier
                     .testTag("bottom_nav_bar")
@@ -267,6 +278,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                     )
                 )
             }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -367,11 +379,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                 }
             }
             if (isInitialLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF8B5A2B))
-                )
+                KinoStreamLoadingScreen(message = initialLoadingMessage)
             }
         }
     }
@@ -393,5 +401,79 @@ fun MainAppScreen(viewModel: MainViewModel) {
             onToggleReminder = { viewModel.toggleReminder(movie) },
             onToggleWatchlist = { viewModel.toggleWatchlist(movie) }
         )
+    }
+}
+
+
+@Composable
+private fun KinoStreamLoadingScreen(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .testTag("kinostream_loading_screen"),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(92.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Movie,
+                    contentDescription = null,
+                    tint = RoyalBlue,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "KinoStream",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Przygotowujemy Twój katalog filmów",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(28.dp))
+            CircularProgressIndicator(
+                modifier = Modifier.size(34.dp),
+                color = RoyalBlue,
+                strokeWidth = 3.dp
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            LinearProgressIndicator(
+                modifier = Modifier.width(220.dp),
+                color = RoyalBlue,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Pobieranie filmów i ocen Filmweb",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
