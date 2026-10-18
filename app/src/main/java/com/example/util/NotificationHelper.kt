@@ -29,6 +29,38 @@ object NotificationHelper {
         }
     }
 
+    fun sendAdminReportNotification(context: Context, title: String, message: String) {
+        val channelId = "kinostream_admin_reports"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Zgłoszenia błędów", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Powiadomienia o zgłoszeniach błędów KinoStream"
+                }
+            )
+        }
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 701, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(701, notification)
+        } catch (_: SecurityException) {
+            // Notification permission may be denied by the user.
+        }
+    }
+
     fun sendPremiereNotification(
         context: Context,
         title: String,
