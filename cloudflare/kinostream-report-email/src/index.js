@@ -162,7 +162,7 @@ export default {
       "Android: " + data.androidVersion.trim(),
       "ID zgłoszenia Firestore: " + data.reportId,
       "",
-      "Zgłoszenie jest również widoczne w panelu administratora KinoStream.",
+      "Zgłoszenie zostało zapisane w bazie KinoStream; ta wiadomość potwierdza przyjęcie zgłoszenia.",
     ].join("\n");
 
     let resendResponse;
