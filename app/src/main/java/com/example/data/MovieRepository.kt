@@ -45,6 +45,19 @@ class MovieRepository(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("kinostream_user_prefs", Context.MODE_PRIVATE)
 
+    private companion object {
+        const val DATA_REFRESH_INTERVAL_MS = 2L * 24L * 60L * 60L * 1000L
+    }
+
+    private fun isRefreshDue(key: String, now: Long = System.currentTimeMillis()): Boolean {
+        val lastSync = prefs.getLong(key, 0L)
+        return lastSync <= 0L || now - lastSync >= DATA_REFRESH_INTERVAL_MS
+    }
+
+    private fun markRefreshed(key: String, now: Long = System.currentTimeMillis()) {
+        prefs.edit().putLong(key, now).apply()
+    }
+
     private val _movies = MutableStateFlow<List<Movie>>(loadCatalogWithCachedPosters())
     val movies: StateFlow<List<Movie>> = _movies.asStateFlow()
 
@@ -161,6 +174,12 @@ class MovieRepository(
      * Firestore document IDs are the same IDs used by the app: tmdb-movie-<id> / tmdb-tv-<id>.
      */
     suspend fun syncFilmwebRatings(): Int = coroutineScope {
+        val cachedRatings = cachedFilmwebRatings()
+        if (!isRefreshDue("filmweb_ratings_last_sync")) {
+            applyFilmwebRatings(cachedRatings)
+            return@coroutineScope cachedRatings.length()
+        }
+
         val snapshot = runCatching {
             FirebaseFirestore.getInstance()
                 .collection("filmweb_ratings")
@@ -226,6 +245,8 @@ class MovieRepository(
      * Pulls official Polish streaming titles from Polish VOD metadata for catalog items.
      */
     suspend fun syncPolishStreamingTitles() = coroutineScope {
+        if (!isRefreshDue("polish_streaming_titles_last_sync")) return@coroutineScope
+
         val currentList = _movies.value.filter { it.hasPolishDubbing && !isOnlineDiscovery(it) }
         var anyUpdated = false
         val updatedList = currentList.map { movie ->
@@ -257,6 +278,7 @@ class MovieRepository(
             _movies.value = updatedList.filter { it.hasPolishDubbing } + discoveries
             persistDiscoveredMovies(discoveries)
         }
+        markRefreshed("polish_streaming_titles_last_sync")
     }
 
     /**
@@ -264,8 +286,13 @@ class MovieRepository(
      * and caches them locally. Returns immediately if all catalog items already have posters.
      */
     suspend fun enrichCatalogPosters() = coroutineScope {
+        if (!isRefreshDue("catalog_posters_last_sync")) return@coroutineScope
+
         val currentList = _movies.value.filter { it.hasPolishDubbing }
-        if (currentList.all { it.posterUrl.isNotBlank() }) return@coroutineScope
+        if (currentList.all { it.posterUrl.isNotBlank() }) {
+            markRefreshed("catalog_posters_last_sync")
+            return@coroutineScope
+        }
 
         val updatedList = currentList.map { movie ->
             if (movie.posterUrl.isNotBlank()) {
@@ -290,6 +317,7 @@ class MovieRepository(
         }.awaitAll()
 
         _movies.value = updatedList.filter { it.hasPolishDubbing }
+        markRefreshed("catalog_posters_last_sync")
     }
 
     /**
@@ -297,10 +325,15 @@ class MovieRepository(
      * that have Polish dubbing and adds them into the catalog.
      */
     suspend fun syncLatestPlatformReleases(sendNotification: Boolean = false): Int {
+        if (!isRefreshDue("latest_platform_releases_last_sync")) return 0
+
         val discovered = runCatching { PosterNetworkService.fetchLatestPlatformReleases() }
             .getOrDefault(emptyList())
             .filter { it.hasPolishDubbing && it.isAvailabilityVerified && it.platforms.isNotEmpty() }
-        if (discovered.isEmpty()) return 0
+        if (discovered.isEmpty()) {
+            markRefreshed("latest_platform_releases_last_sync")
+            return 0
+        }
 
         val current = _movies.value.filter { it.hasPolishDubbing }.toMutableList()
         val existingIds = current.mapTo(mutableSetOf()) { it.id }
@@ -339,6 +372,7 @@ class MovieRepository(
             _movies.value = current.filter { it.hasPolishDubbing }
             persistDiscoveredMovies(_movies.value.filter(::isOnlineDiscovery))
         }
+        markRefreshed("latest_platform_releases_last_sync")
         if (addedCount > 0) {
             _autoSyncedCount.value = _autoSyncedCount.value + addedCount
             if (sendNotification && _notificationsEnabled.value && firstAdded != null &&
@@ -365,8 +399,7 @@ class MovieRepository(
     suspend fun discoverMoreMovies(force: Boolean = false): Int = coroutineScope {
         val now = System.currentTimeMillis()
         val lastSync = prefs.getLong("verified_polish_vod_v3_last_sync", 0L)
-        val refreshInterval = 7L * 24L * 60L * 60L * 1000L
-        if (!force && now - lastSync < refreshInterval) return@coroutineScope 0
+        if (!force && now - lastSync < DATA_REFRESH_INTERVAL_MS) return@coroutineScope 0
 
         // Only this source returns provider-specific availability for Poland.
         val verifiedResults = runCatching {
