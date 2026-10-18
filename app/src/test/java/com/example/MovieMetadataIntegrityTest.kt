@@ -2,8 +2,11 @@ package com.example
 
 import com.example.data.MovieCatalog
 import com.example.data.PosterNetworkService
+import com.example.data.parseStreamingPlatform
 import com.example.model.MovieRatingSource
+import com.example.model.StreamingPlatform
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,6 +41,17 @@ class MovieMetadataIntegrityTest {
         assertTrue(tvMazeRated.hasRating)
         assertFalse(tvMazeRated.isRecommendedOnFilmweb)
         assertFalse(tvMazeRated.isWithinRatingRange(6.5, 10.0))
+    }
+
+    @Test
+    fun `cached provider IDs and enum names resolve to the same platforms`() {
+        assertEquals(StreamingPlatform.NETFLIX, parseStreamingPlatform("NETFLIX"))
+        assertEquals(StreamingPlatform.NETFLIX, parseStreamingPlatform("netflix"))
+        assertEquals(StreamingPlatform.PRIME_VIDEO, parseStreamingPlatform("prime"))
+        assertEquals(StreamingPlatform.PRIME_VIDEO, parseStreamingPlatform("Prime Video"))
+        assertEquals(StreamingPlatform.DISNEY_PLUS, parseStreamingPlatform("disney"))
+        assertEquals(StreamingPlatform.SKYSHOWTIME, parseStreamingPlatform("skyshowtime"))
+        assertEquals(null, parseStreamingPlatform("unknown-platform"))
     }
 
     @Test
