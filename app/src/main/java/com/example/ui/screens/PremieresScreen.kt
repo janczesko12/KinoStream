@@ -100,13 +100,13 @@ fun PremieresScreen(
             ) {
                 Column {
                     Text(
-                        text = "Premiery i Auto-Nowości",
+                        text = "Premiery i nowości VOD",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Netflix • Prime Video • Max • Disney+ • SkyShowtime",
+                        text = "Nowe tytuły dostępne w polskim VOD • według daty premiery",
                         style = MaterialTheme.typography.bodySmall,
                         color = RoyalBlue,
                         fontWeight = FontWeight.SemiBold
@@ -298,6 +298,62 @@ fun PremieresScreen(
             }
         }
 
+        // Explain an empty result and let the user retry without showing fabricated dates.
+        if (premieres.isEmpty()) {
+            item(contentType = "empty_premieres") {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .testTag("empty_premieres_state"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null,
+                            tint = RoyalBlue,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Text(
+                            text = "Brak świeżych premier",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Pokażemy tu filmy i seriale z ostatnich 180 dni, które są obecnie dostępne na obsługiwanych platformach w Polsce. Daty dotyczą premiery tytułu, nie dokładnego dnia dodania go do VOD.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onSyncNewReleasesNow,
+                            enabled = !isSyncing,
+                            modifier = Modifier.testTag("btn_retry_premieres"),
+                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Sync,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isSyncing) "Sprawdzanie..." else "Odśwież premiery")
+                        }
+                    }
+                }
+            }
+        }
+
         // List of Premieres
         items(
             items = premieres,
@@ -339,7 +395,7 @@ fun PremieresScreen(
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "🗓️  ${movie.premiereDate ?: "Premiera wkrótce"}",
+                                    text = "🗓️  Premiera: ${movie.premiereDate ?: "brak daty"}",
                                     color = if (movie.isAutoSynced) FilmwebGreen else RoyalBlue,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
