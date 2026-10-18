@@ -75,6 +75,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isSyncingNewReleases = MutableStateFlow(false)
     val isSyncingNewReleases: StateFlow<Boolean> = _isSyncingNewReleases.asStateFlow()
 
+    private val _isInitialLoading = MutableStateFlow(true)
+    val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
+
     private val _currentTab = MutableStateFlow(MainTab.DISCOVER)
     val currentTab: StateFlow<MainTab> = _currentTab.asStateFlow()
 
@@ -108,13 +111,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var onlineSearchJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withTimeoutOrNull(12_000) {
+                    kotlinx.coroutines.coroutineScope {
+                        val discoveryJob = launch { repository.discoverMoreMovies() }
+                        val ratingsJob = launch { repository.syncFilmwebRatings() }
+                        discoveryJob.join()
+                        ratingsJob.join()
+                    }
+                }
+            } finally {
+                _isInitialLoading.value = false
+            }
+        }
         // Start verified TMDB/JustWatch discovery immediately so the catalogue does not wait
         // for title/poster enrichment requests to finish.
-        viewModelScope.launch {
-            repository.discoverMoreMovies()
-            // Ratings are read from Firestore independently from TMDB discovery.
-            repository.syncFilmwebRatings()
-        }
         viewModelScope.launch {
             repository.syncPolishStreamingTitles()
             repository.enrichCatalogPosters()
@@ -418,6 +430,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun sendTestNotification() {
         repository.sendTestPremiereNotification()
         _snackbarMessage.value = "Wysłano testowe powiadomienie o premierze!"
+    }
+
+    fun submitProblemReport(description: String, contextInfo: String = "") {
+        val trimmed = description.trim()
+        if (trimmed.isEmpty()) {
+            _snackbarMessage.value = "Opisz problem przed wysłaniem zgłoszenia."
+            return
+        }
+        val payload = hashMapOf(
+            "description" to trimmed,
+            "context" to contextInfo,
+            "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+            "status" to "new",
+            "app" to "KinoStream",
+            "appVersion" to com.example.BuildConfig.VERSION_NAME,
+            "device" to android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL,
+            "androidVersion" to android.os.Build.VERSION.RELEASE
+        )
+        _snackbarMessage.value = "Wysyłanie zgłoszenia…"
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            .collection("problem_reports")
+            .add(payload)
+            .addOnSuccessListener {
+                _snackbarMessage.value = "Zgłoszenie wysłane. Dziękujemy!"
+                com.example.util.NotificationHelper.sendAdminReportNotification(
+                    getApplication(), "Nowe zgłoszenie KinoStream", trimmed.take(120)
+                )
+            }
+            .addOnFailureListener {
+                _snackbarMessage.value = "Nie udało się wysłać zgłoszenia. Sprawdź połączenie i spróbuj ponownie."
+            }
     }
 
     fun clearSnackbar() {
