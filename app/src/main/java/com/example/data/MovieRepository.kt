@@ -36,6 +36,11 @@ class MovieRepository(
     private val _movies = MutableStateFlow<List<Movie>>(loadCatalogWithCachedPosters())
     val movies: StateFlow<List<Movie>> = _movies.asStateFlow()
 
+    init {
+        // Reuse the last successful Firestore sync immediately; a network refresh follows in ViewModel.
+        applyFilmwebRatings()
+    }
+
     val watchlistEntries: Flow<List<WatchlistEntity>> = watchlistDao.getAllWatchlistItems()
     val watchlistMovieIdsFlow: Flow<Set<String>> = watchlistDao.getAllWatchlistIds().map { it.toSet() }
 
