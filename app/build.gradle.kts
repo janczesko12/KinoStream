@@ -6,6 +6,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.crashlytics)
 }
 
 // TMDB read-only API credential comes from CI secret or a local Gradle property.
@@ -124,6 +125,7 @@ dependencies {
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
   implementation(libs.firebase.firestore)
+  implementation(libs.firebase.crashlytics)
   implementation(libs.kotlinx.coroutines.play.services)
 
   // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
