@@ -30,7 +30,7 @@ Panel akceptuje tylko ten adres. To ograniczenie w interfejsie nie zastępuje za
 
 Plik `firestore.rules` w repozytorium pokazuje reguły dla dwóch kolekcji używanych przez tę funkcję:
 - `filmweb_ratings`: publiczny odczyt, brak zapisu z aplikacji klienckiej;
-- `problem_reports`: użytkownicy mogą tworzyć walidowane zgłoszenia, tylko potwierdzone konto administratora może je odczytać i zmieniać status.
+- `problem_reports`: zgłoszenia są zapisywane w Firestore; odczyt i zmiana statusu pozostają ograniczone do potwierdzonego konta administratora. Aplikacja nie ma już wbudowanego panelu administratora.
 
 Przed wdrożeniem przejrzyj reguły obecnie działające w Firebase Console. **Nie zastępuj ich w ciemno** — połącz reguły z tego pliku z pozostałymi regułami projektu, jeśli inne strony, funkcje lub kolekcje również korzystają z Firestore. Wklejenie całego pliku jako jedynych reguł blokuje dostęp do wszystkich kolekcji niewymienionych w tym pliku.
 
@@ -57,8 +57,8 @@ Dokumentacja: https://firebase.google.com/docs/crashlytics/alerts-default.
 
 ## 6. Jak działa raportowanie
 
-- Użytkownik wysyła zgłoszenie przez **Ustawienia → Zgłoś problem**. Po zalogowaniu administratorowi pojawia się osobna karta **Admin** w dolnym menu; lista aktualizuje się w czasie rzeczywistym.
-- Można oznaczyć zgłoszenie jako rozwiązane. Historia nie jest usuwana z panelu.
+- Użytkownik wysyła zgłoszenie przez **Ustawienia → Zgłoś problem**. Zgłoszenie jest zapisywane w Firestore, a Worker wysyła powiadomienie e-mail na `janczesko12@gmail.com`, jeśli Cloudflare i Resend są poprawnie skonfigurowane.
+- Wbudowany panel administratora został usunięty z aplikacji; zgłoszenia nadal są przechowywane w Firestore.
 - Crashlytics automatycznie zbiera awarie aplikacji oraz ANR, jeśli Firebase jest poprawnie skonfigurowany. Kod dodaje też wersję aplikacji i informacje o urządzeniu jako klucze raportu, nie zapisuje adresu e-mail użytkownika jako identyfikatora Crashlytics.
 - Błędy zgłoszeń i logowania, które da się obsłużyć, są rejestrowane jako błędy niefatalne, gdy Firebase jest dostępny.
 
