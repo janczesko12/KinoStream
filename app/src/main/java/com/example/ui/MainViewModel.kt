@@ -129,6 +129,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+    private val _problemReportSuccessVersion = MutableStateFlow(0)
+    val problemReportSuccessVersion: StateFlow<Int> = _problemReportSuccessVersion.asStateFlow()
 
     private val adminAllowedEmail = "janczesko12@gmail.com"
     private val _isAdminAuthenticated = MutableStateFlow(false)
@@ -504,6 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         firestore.collection("problem_reports")
             .add(payload)
             .addOnSuccessListener {
+                _problemReportSuccessVersion.value += 1
                 _snackbarMessage.value = "Zgłoszenie wysłane. Dziękujemy!"
             }
             .addOnFailureListener { error ->
