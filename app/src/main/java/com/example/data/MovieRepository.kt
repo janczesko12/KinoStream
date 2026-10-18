@@ -9,6 +9,7 @@ import com.example.model.Movie
 import com.example.model.MovieGenre
 import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
+import com.example.model.isDisplayableMetadata
 import org.json.JSONArray
 import org.json.JSONObject
 import com.example.ui.theme.ThemeMode
@@ -639,7 +640,7 @@ class MovieRepository(
                         // and older/API-style identifiers (netflix, prime, Prime Video).
                         platforms = strings("platforms").mapNotNull(::parseStreamingPlatform),
                         durationMinutes = item.optInt("duration", 0),
-                        director = item.optString("director", "Brak danych"),
+                        director = item.optString("director", "").takeIf { it.isDisplayableMetadata() }.orEmpty(),
                         cast = strings("cast"),
                         description = item.optString("description"),
                         posterGradientColors = longs("posterGradientColors"),
@@ -652,7 +653,7 @@ class MovieRepository(
                         isUpcoming = item.optBoolean("isUpcoming", false),
                         isAutoSynced = item.optBoolean("isAutoSynced", false),
                         hasPolishDubbing = item.optBoolean("hasPolishDubbing", false),
-                        ageRating = item.optString("ageRating", "16+"),
+                        ageRating = item.optString("ageRating", "16+").takeIf { it.isDisplayableMetadata() }.orEmpty(),
                         polishTitle = item.optString("polishTitle"),
                         profileLogoUrl = item.optString("profileLogoUrl"),
                         ratingSource = runCatching {
