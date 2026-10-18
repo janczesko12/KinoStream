@@ -13,6 +13,7 @@ import com.example.model.MovieSortOption
 import com.example.model.StreamingPlatform
 import com.example.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,6 +78,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isInitialLoading = MutableStateFlow(true)
     val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
+    private val _initialLoadingMessage = MutableStateFlow("Przygotowujemy Twój katalog filmów…")
+    val initialLoadingMessage: StateFlow<String> = _initialLoadingMessage.asStateFlow()
 
     private val _currentTab = MutableStateFlow(MainTab.DISCOVER)
     val currentTab: StateFlow<MainTab> = _currentTab.asStateFlow()
@@ -113,29 +116,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             try {
-                kotlinx.coroutines.withTimeoutOrNull(12_000) {
+                // Show a real loading screen while the startup data stages are running.
+                kotlinx.coroutines.withTimeoutOrNull(30_000) {
                     kotlinx.coroutines.coroutineScope {
-                        val discoveryJob = launch { repository.discoverMoreMovies() }
-                        val ratingsJob = launch { repository.syncFilmwebRatings() }
-                        discoveryJob.join()
-                        ratingsJob.join()
+                        _initialLoadingMessage.value = "Pobieranie filmów i seriali…"
+                        val catalogJob = async { runCatching { repository.discoverMoreMovies() } }
+                        val ratingsJob = async { runCatching { repository.syncFilmwebRatings() } }
+                        catalogJob.await()
+                        ratingsJob.await()
+
+                        _initialLoadingMessage.value = "Aktualizowanie opisów i plakatów…"
+                        val titlesJob = async { runCatching { repository.syncPolishStreamingTitles() } }
+                        val postersJob = async { runCatching { repository.enrichCatalogPosters() } }
+                        titlesJob.await()
+                        postersJob.await()
+
+                        if (repository.autoAddNewReleasesEnabled.value) {
+                            _initialLoadingMessage.value = "Sprawdzanie najnowszych premier…"
+                            _isSyncingNewReleases.value = true
+                            try {
+                                runCatching { repository.syncLatestPlatformReleases(sendNotification = false) }
+                            } finally {
+                                _isSyncingNewReleases.value = false
+                            }
+                        }
+
+                        _initialLoadingMessage.value = "Gotowe! Otwieramy katalog…"
                     }
                 }
             } finally {
                 _isInitialLoading.value = false
-            }
-        }
-        // Start verified TMDB/JustWatch discovery immediately so the catalogue does not wait
-        // for title/poster enrichment requests to finish.
-        viewModelScope.launch {
-            repository.syncPolishStreamingTitles()
-            repository.enrichCatalogPosters()
-        }
-        viewModelScope.launch {
-            if (repository.autoAddNewReleasesEnabled.value) {
-                _isSyncingNewReleases.value = true
-                repository.syncLatestPlatformReleases(sendNotification = false)
-                _isSyncingNewReleases.value = false
             }
         }
     }
