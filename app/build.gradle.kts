@@ -14,6 +14,13 @@ val tmdbApiKey = providers.environmentVariable("TMDB_API_KEY")
   .orElse(providers.gradleProperty("TMDB_API_KEY"))
   .getOrElse("")
 
+val reportEmailWorkerUrl = providers.environmentVariable("REPORT_EMAIL_WORKER_URL")
+  .orElse(providers.gradleProperty("REPORT_EMAIL_WORKER_URL"))
+  .getOrElse("")
+val escapedReportEmailWorkerUrl = reportEmailWorkerUrl
+  .replace("\\", "\\\\")
+  .replace("\"", "\\\"")
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
