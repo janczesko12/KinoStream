@@ -37,7 +37,8 @@ enum class MainTab(val title: String) {
     DISCOVER("Katalog"),
     PREMIERES("Premiery"),
     MY_LIST("Moja Lista"),
-    SETTINGS("Ustawienia")
+    SETTINGS("Ustawienia"),
+    ADMIN("Admin")
 }
 
 enum class MyListFilter(val label: String) {
