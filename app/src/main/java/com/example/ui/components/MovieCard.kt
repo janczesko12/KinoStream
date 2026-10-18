@@ -218,14 +218,24 @@ fun MovieCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "Reż. ${movie.director}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+                    val director = movie.director.trim()
+                    if (
+                        director.isNotBlank() &&
+                        !director.equals("Brak danych", ignoreCase = true) &&
+                        !director.equals("Unknown", ignoreCase = true)
+                    ) {
+                        Text(
+                            text = "Reż. $director",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        // Unavailable director metadata should not look like a missing platform.
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
