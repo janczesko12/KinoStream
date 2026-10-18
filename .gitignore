@@ -16,3 +16,6 @@
 local.properties
 .env
 debug.keystore
+
+# Firebase client configuration (supply locally or through GitHub Actions secret)
+app/google-services.json
