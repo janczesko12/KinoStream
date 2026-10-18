@@ -39,6 +39,11 @@ android {
       "TMDB_API_KEY",
       "\"${tmdbApiKey}\""
     )
+    buildConfigField(
+      "String",
+      "REPORT_EMAIL_WORKER_URL",
+      "\"\u0024{escapedReportEmailWorkerUrl}\""
+    )
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
