@@ -14,6 +14,7 @@ import com.example.model.MovieGenre
 import com.example.model.MovieRatingSource
 import com.example.model.MovieSortOption
 import com.example.model.StreamingPlatform
+import com.example.model.isRecentReleaseDate
 import com.example.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -254,12 +255,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         selectedPlatform,
         usePolishTitles
     ) { movies, platform, usePolish ->
-        movies.filter {
-            it.isAvailabilityVerified && it.platforms.isNotEmpty() &&
-                (it.isPremiere || it.isUpcoming || it.isAutoSynced)
+        movies.filter { movie ->
+            movie.isAvailabilityVerified &&
+                movie.platforms.isNotEmpty() &&
+                isRecentReleaseDate(movie.premiereDate)
         }.filter { platform == null || it.platforms.contains(platform) }
             .map { it.withLanguage(usePolish) }
-            .sortedByDescending { it.year }
+            .sortedByDescending { it.premiereDate.orEmpty() }
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
