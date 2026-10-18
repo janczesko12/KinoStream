@@ -11,6 +11,8 @@ permissions:
 env:
   # Add the free TMDB read-only API key as the TMDB_API_KEY repository Actions secret.
   TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+  # Public endpoint only; the Resend API key stays in Cloudflare Worker secrets.
+  REPORT_EMAIL_WORKER_URL: ${{ vars.REPORT_EMAIL_WORKER_URL }}
 
 concurrency:
   group: kinostream-${{ github.ref }}
