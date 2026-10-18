@@ -26,6 +26,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlin.math.round
 
+internal fun parseStreamingPlatform(value: String): StreamingPlatform? {
+    val candidate = value.trim()
+    if (candidate.isEmpty()) return null
+
+    return StreamingPlatform.values().firstOrNull { platform ->
+        platform.name.equals(candidate, ignoreCase = true) ||
+            platform.id.equals(candidate, ignoreCase = true) ||
+            platform.displayName.equals(candidate, ignoreCase = true)
+    }
+}
+
 class MovieRepository(
     private val context: Context,
     private val watchlistDao: WatchlistDao = KinoStreamDatabase.getInstance(context).watchlistDao()
@@ -624,9 +635,9 @@ class MovieRepository(
                         genre = runCatching { MovieGenre.valueOf(item.optString("genre", "DRAMAT")) }.getOrDefault(MovieGenre.DRAMAT),
                         filmwebRating = item.optDouble("rating", 0.0),
                         filmwebVotesCount = item.optInt("votes", 0),
-                        platforms = strings("platforms").mapNotNull { value ->
-                            runCatching { StreamingPlatform.valueOf(value) }.getOrNull()
-                        },
+                        // Support both enum names from current cache writes (NETFLIX)
+                        // and older/API-style identifiers (netflix, prime, Prime Video).
+                        platforms = strings("platforms").mapNotNull(::parseStreamingPlatform),
                         durationMinutes = item.optInt("duration", 0),
                         director = item.optString("director", "Brak danych"),
                         cast = strings("cast"),
