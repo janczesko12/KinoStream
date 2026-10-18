@@ -468,7 +468,7 @@ object PosterNetworkService {
                         isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = show.optInt("averageRuntime", 50).takeIf { it > 0 } ?: 50,
-                        director = "Brak danych",
+                        director = "",
                         cast = emptyList(),
                         description = "Metadane serialu z TVMaze. Ocena nie pochodzi z Filmweb, a dostępność w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
@@ -547,7 +547,7 @@ object PosterNetworkService {
                                 isAvailabilityVerified = false,
                                 platforms = emptyList<StreamingPlatform>(),
                                 durationMinutes = runtime,
-                                director = "Brak danych",
+                                director = "",
                                 cast = emptyList(),
                                 description = "Metadane serialu z TVMaze. Ocena jest oceną TVMaze, a nie Filmweb. Polska wersja językowa i dostępność w Polsce nie zostały zweryfikowane.",
                                 posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
@@ -556,7 +556,7 @@ object PosterNetworkService {
                                 backdropUrl = imageUrl,
                                 isSeries = true,
                                 hasPolishDubbing = true,
-                                ageRating = "Brak danych"
+                                ageRating = ""
                             )
                         )
                     }
@@ -750,7 +750,7 @@ object PosterNetworkService {
                         ratingSource = MovieRatingSource.NONE,
                         platforms = listOf(query.platform),
                         durationMinutes = if (isSeries) 45 else 100,
-                        director = "Brak danych",
+                        director = "",
                         cast = emptyList(),
                         description = description,
                         posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
@@ -760,7 +760,7 @@ object PosterNetworkService {
                         isSeries = isSeries,
                         premiereDate = date.takeIf { it.isNotBlank() },
                         hasPolishDubbing = true,
-                        ageRating = "Brak danych",
+                        ageRating = "",
                         isAvailabilityVerified = true
                     )
                 )
@@ -863,7 +863,7 @@ object PosterNetworkService {
                         isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = show.optInt("averageRuntime", 50).takeIf { it > 0 } ?: 50,
-                        director = "Brak danych",
+                        director = "",
                         cast = emptyList(),
                         description = "Metadane serialu z TVMaze. Ocena nie pochodzi z Filmweb, a dostępność w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF0F4C81, 0xFF1B263B, 0xFF0D1B2A),
@@ -935,7 +935,7 @@ object PosterNetworkService {
                         isAvailabilityVerified = false,
                         platforms = platforms,
                         durationMinutes = durationMinutes,
-                        director = "Brak danych",
+                        director = "",
                         cast = emptyList(),
                         description = "Metadane i plakat z Apple iTunes. Ocena Filmweb, dostępność VOD w Polsce i polska wersja językowa nie zostały zweryfikowane.",
                         posterGradientColors = listOf(0xFF1D3557, 0xFF457B9D, 0xFF0D1B2A),
