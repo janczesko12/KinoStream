@@ -552,9 +552,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _isAdminAuthenticated.value = false
                     _adminMessage.value = "To konto nie jest kontem administratora."
                 } else if (!user.isEmailVerified) {
-                    auth.signOut()
                     _isAdminAuthenticated.value = false
-                    _adminMessage.value = "Najpierw potwierdź adres e-mail administratora."
+                    _adminMessage.value = "Wysyłanie linku potwierdzającego adres e-mail…"
+                    user.sendEmailVerification()
+                        .addOnSuccessListener {
+                            auth.signOut()
+                            _isAdminLoading.value = false
+                            _adminMessage.value = "Wysłaliśmy link potwierdzający. Otwórz wiadomość e-mail, potwierdź adres i zaloguj się ponownie."
+                        }
+                        .addOnFailureListener { error ->
+                            auth.signOut()
+                            _isAdminLoading.value = false
+                            _adminMessage.value = "Nie udało się wysłać wiadomości weryfikacyjnej. Sprawdź ustawienia szablonów e-mail w Firebase."
+                            CrashReporting.recordNonFatal(getApplication(), error)
+                        }
+                    return@addOnSuccessListener
                 } else {
                     _isAdminAuthenticated.value = true
                     _adminUserEmail.value = user.email
