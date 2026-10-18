@@ -573,6 +573,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _adminUserEmail.value = user.email
                     _adminMessage.value = null
                     listenForProblemReports()
+                    setTab(MainTab.ADMIN)
                 }
                 _isAdminLoading.value = false
             }
@@ -592,6 +593,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _problemReports.value = emptyList()
         _adminMessage.value = null
         _isAdminLoading.value = false
+        setTab(MainTab.SETTINGS)
     }
 
     fun refreshProblemReports() {
