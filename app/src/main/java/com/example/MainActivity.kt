@@ -416,13 +416,10 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         problemReportSuccessVersion = problemReportSuccessVersion,
                         isAdminAuthenticated = isAdminAuthenticated,
                         adminUserEmail = adminUserEmail,
-                        adminReports = adminReports,
                         adminMessage = adminMessage,
                         isAdminLoading = isAdminLoading,
                         onAdminSignIn = viewModel::signInAdmin,
                         onAdminSignOut = viewModel::signOutAdmin,
-                        onAdminRefresh = viewModel::refreshProblemReports,
-                        onResolveProblemReport = viewModel::resolveProblemReport,
                         onOpenAdminPanel = { viewModel.setTab(MainTab.ADMIN) }
                     )
                 }
