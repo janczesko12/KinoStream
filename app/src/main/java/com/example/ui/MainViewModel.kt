@@ -488,15 +488,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _snackbarMessage.value = "Opis jest za długi. Maksymalnie 3000 znaków."
             return
         }
+        val reportContext = contextInfo.take(500)
+        val reportBody = buildString {
+            appendLine("Otrzymano nowe zgłoszenie błędu w KinoStream.")
+            appendLine()
+            appendLine("Opis:")
+            appendLine(trimmed)
+            if (reportContext.isNotBlank()) {
+                appendLine()
+                appendLine("Kontekst:")
+                appendLine(reportContext)
+            }
+            appendLine()
+            appendLine("Wersja aplikacji: ${com.example.BuildConfig.VERSION_NAME}")
+            appendLine("Urządzenie: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+            appendLine("Android: ${android.os.Build.VERSION.RELEASE ?: "unknown"}")
+            appendLine()
+            append("Zgłoszenie jest też widoczne w panelu administratora KinoStream.")
+        }
         val payload = hashMapOf(
             "description" to trimmed,
-            "context" to contextInfo.take(500),
+            "context" to reportContext,
             "createdAt" to FieldValue.serverTimestamp(),
             "status" to "new",
             "app" to "KinoStream",
             "appVersion" to com.example.BuildConfig.VERSION_NAME,
             "device" to (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).take(200),
-            "androidVersion" to (android.os.Build.VERSION.RELEASE ?: "unknown")
+            "androidVersion" to (android.os.Build.VERSION.RELEASE ?: "unknown"),
+            // Used by Firebase's Trigger Email extension when it watches problem_reports.
+            // Firestore rules pin this recipient so clients cannot email arbitrary addresses.
+            "to" to listOf("janczesko12@gmail.com"),
+            "message" to mapOf(
+                "subject" to "[KinoStream] Nowe zgłoszenie błędu",
+                "text" to reportBody
+            )
         )
         val firestore = runCatching { FirebaseFirestore.getInstance() }.getOrElse { error ->
             CrashReporting.recordNonFatal(getApplication(), error)
