@@ -18,21 +18,12 @@ service cloud.firestore {
     match /problem_reports/{reportId} {
       allow create: if request.resource.data.keys().hasAll([
           'description', 'context', 'createdAt', 'status', 'app',
-          'appVersion', 'device', 'androidVersion', 'to', 'message'
+          'appVersion', 'device', 'androidVersion'
         ])
         && request.resource.data.keys().hasOnly([
           'description', 'context', 'createdAt', 'status', 'app',
-          'appVersion', 'device', 'androidVersion', 'to', 'message'
+          'appVersion', 'device', 'androidVersion'
         ])
-        && request.resource.data.to is list
-        && request.resource.data.to.size() == 1
-        && request.resource.data.to[0] == 'janczesko12@gmail.com'
-        && request.resource.data.message is map
-        && request.resource.data.message.keys().hasAll(['subject', 'text'])
-        && request.resource.data.message.keys().hasOnly(['subject', 'text'])
-        && request.resource.data.message.subject == '[KinoStream] Nowe zgłoszenie błędu'
-        && request.resource.data.message.text is string
-        && request.resource.data.message.text.size() <= 5000
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
         && request.resource.data.description.size() <= 3000
