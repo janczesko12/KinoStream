@@ -7,7 +7,11 @@ import com.example.ui.theme.MaxPurple
 import com.example.ui.theme.NetflixRed
 import com.example.ui.theme.PrimeVideoBlue
 import com.example.ui.theme.SkyShowtimeTeal
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 enum class StreamingPlatform(
     val id: String,
@@ -41,11 +45,23 @@ fun String.isDisplayableMetadata(): Boolean {
  */
 fun isRecentReleaseDate(
     releaseDate: String?,
-    today: LocalDate = LocalDate.now(),
-    lookbackDays: Long = 180
+    today: String = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }.format(Date()),
+    lookbackDays: Int = 180
 ): Boolean {
-    val parsed = releaseDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return false
-    return !parsed.isAfter(today) && !parsed.isBefore(today.minusDays(lookbackDays.coerceAtLeast(1)))
+    val rawReleaseDate = releaseDate ?: return false
+    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+        isLenient = false
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
+    val parsedRelease = runCatching { formatter.parse(rawReleaseDate) }.getOrNull() ?: return false
+    val parsedToday = runCatching { formatter.parse(today) }.getOrNull() ?: return false
+    val earliestAllowed = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.US).apply {
+        time = parsedToday
+        add(Calendar.DAY_OF_YEAR, -lookbackDays.coerceAtLeast(1))
+    }.time
+    return !parsedRelease.after(parsedToday) && !parsedRelease.before(earliestAllowed)
 }
 
 enum class MovieGenre(val displayName: String) {
