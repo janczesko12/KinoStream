@@ -5,6 +5,7 @@ import com.example.data.PosterNetworkService
 import com.example.data.parseStreamingPlatform
 import com.example.model.MovieRatingSource
 import com.example.model.StreamingPlatform
+import com.example.model.isDisplayableMetadata
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -41,6 +42,15 @@ class MovieMetadataIntegrityTest {
         assertTrue(tvMazeRated.hasRating)
         assertFalse(tvMazeRated.isRecommendedOnFilmweb)
         assertFalse(tvMazeRated.isWithinRatingRange(6.5, 10.0))
+    }
+
+    @Test
+    fun `placeholder metadata is treated as unavailable`() {
+        assertFalse("Brak danych".isDisplayableMetadata())
+        assertFalse("   ".isDisplayableMetadata())
+        assertFalse("N/A".isDisplayableMetadata())
+        assertTrue("Netflix".isDisplayableMetadata())
+        assertTrue("Prime Video".isDisplayableMetadata())
     }
 
     @Test
