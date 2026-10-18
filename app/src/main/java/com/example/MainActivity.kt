@@ -383,7 +383,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
 
                     )
                 }
-
+            }
             if (isInitialLoading) {
                 KinoStreamLoadingScreen(message = initialLoadingMessage)
             }
