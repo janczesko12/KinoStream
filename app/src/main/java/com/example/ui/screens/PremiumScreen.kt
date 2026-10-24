@@ -46,13 +46,13 @@ private val freeFilmSources = listOf(
     FreeFilmSource(
         name = "Ninateka",
         subtitle = "Darmowe filmy i polska klasyka",
-        description = "Otwiera bezpłatny katalog filmów i bajek w Ninatece — serwisie Filmoteki Narodowej – Instytutu Audiowizualnego. Wszystkie materiały w Ninatece są udostępniane bez opłat.",
-        url = "https://ninateka.pl/filmy?SearchQuery=&MediaType=&Paid=False&CategoryDenames=bajki%2Cfilm&YearFrom=1927&YearTo=2020&Transcription=False&SignLanguage=False&AudioDesc=False&Edu=False&EnglishVersion=False&Partner=&Subject=&Level=&Topic=&Desc=True&Sort=Recommended"
+        description = "Bezpłatna biblioteka Filmoteki Narodowej – Instytutu Audiowizualnego: filmy fabularne, animacje, dokumenty i materiały archiwalne.",
+        url = "https://ninateka.pl/ogladaj"
     ),
     FreeFilmSource(
         name = "35mm.online",
         subtitle = "Polskie kino i archiwalia",
-        description = "Platforma VOD WFDiF z polskimi filmami fabularnymi, dokumentami, kronikami filmowymi i animacjami. Sprawdź dostępność konkretnego materiału na stronie.",
+        description = "Bezpłatna platforma WFDiF z polskimi filmami fabularnymi, dokumentami, kronikami filmowymi i animacjami. Oferta może się zmieniać.",
         url = "https://35mm.online/"
     ),
     FreeFilmSource(
@@ -64,8 +64,8 @@ private val freeFilmSources = listOf(
     FreeFilmSource(
         name = "ARTE.tv",
         subtitle = "Kino europejskie i dokumenty",
-        description = "Filmy, dokumenty i reportaże. Dostępność poszczególnych materiałów może zależeć od kraju i okresu udostępnienia.",
-        url = "https://www.arte.tv/pl/"
+        description = "Darmowe filmy i programy kulturalne. Dostępność poszczególnych materiałów zależy od praw do emisji w Polsce i okresu udostępnienia.",
+        url = "https://www.arte.tv/pl/videos/RC-024283/filmy/"
     )
 )
 
@@ -124,13 +124,13 @@ fun PremiumScreen() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Co obejrzysz?",
+                    text = "Premium jest teraz całkowicie darmowe",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Na start zebraliśmy darmowe biblioteki filmowe, dokumenty i polskie archiwalia. Wybierz źródło, aby przejść do jego oficjalnego katalogu.",
+                    text = "Nie potrzebujesz płatności ani subskrypcji. Wybierz legalne źródło i przejdź do jego katalogu filmów, seriali, dokumentów lub animacji. Płatności możemy dodać w przyszłej wersji.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 21.sp
