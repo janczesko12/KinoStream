@@ -69,8 +69,10 @@ private data class FreeMovie(
     val description: String,
     val streamUrl: String,
     val posterUrl: String,
-    val watchUrl: String,
     val sourceUrl: String,
+    val credit: String,
+    val license: String,
+    val licenseUrl: String,
     val colors: List<Color>
 )
 
@@ -82,10 +84,12 @@ private val freeMovies = listOf(
         duration = "9 min 56 s",
         genre = "Animacja • Komedia",
         description = "Wielki, łagodny królik ma dość zaczepek trzech gryzoni z lasu. Zabawna animacja pełna pościgów i leśnych przygód.",
-        streamUrl = "https://video.blender.org/static/webseed/bf1f3fb5-b119-4f9f-9930-8e20e892b898-720.mp4",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/bf1f3fb5-b119-4f9f-9930-8e20e892b898-720.mp4",
         posterUrl = "https://video.blender.org/lazy-static/thumbnails/bf1f3fb5-b119-4f9f-9930-8e20e892b898.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/bf1f3fb5-b119-4f9f-9930-8e20e892b898",
-        sourceUrl = "https://studio.blender.org/projects/big-buck-bunny/",
+        sourceUrl = "https://peach.blender.org/",
+        credit = "Big Buck Bunny (2008) © Blender Foundation",
+        license = "CC BY 3.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/3.0/",
         colors = listOf(Color(0xFF164E38), Color(0xFF071B23))
     ),
     FreeMovie(
@@ -95,24 +99,28 @@ private val freeMovies = listOf(
         duration = "14 min 48 s",
         genre = "Fantasy • Przygodowy",
         description = "Samotna wędrowniczka przemierza niebezpieczną krainę, by odnaleźć smoczątko, z którym połączyła ją niezwykła więź.",
-        streamUrl = "https://video.blender.org/static/webseed/0eb052d0-fd51-43e6-aa33-ecdbf77a5d40-720.mp4",
-        posterUrl = "https://video.blender.org/lazy-static/thumbnails/0eb052d0-fd51-43e6-aa33-ecdbf77a5d40.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/0eb052d0-fd51-43e6-aa33-ecdbf77a5d40",
-        sourceUrl = "https://studio.blender.org/projects/sintel/",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/0eb052d0-fd51-43e6-aa33-ecdbf77a5d40-818.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/03/f7/03f7b0d15c55b428680d4c6bb313f742_m.webp",
+        sourceUrl = "https://durian.blender.org/",
+        credit = "Sintel (2010) © Blender Foundation",
+        license = "CC BY 3.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/3.0/",
         colors = listOf(Color(0xFF8F3E30), Color(0xFF161F35))
     ),
     FreeMovie(
-        id = "tears-of-steel",
-        title = "Tears of Steel",
-        year = 2012,
-        duration = "12 min 14 s",
-        genre = "Sci-fi • Akcja",
-        description = "W futurystycznym Amsterdamie grupa naukowców próbuje ocalić świat, łącząc eksperymenty technologiczne z trudną misją.",
-        streamUrl = "https://video.blender.org/static/webseed/8533ea43-4271-4a57-9694-e9d0b35e1aa1-720.mp4",
-        posterUrl = "https://video.blender.org/lazy-static/thumbnails/8533ea43-4271-4a57-9694-e9d0b35e1aa1.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/8533ea43-4271-4a57-9694-e9d0b35e1aa1",
-        sourceUrl = "https://mango.blender.org/production/tears-of-steel-download-watch/",
-        colors = listOf(Color(0xFF126A7A), Color(0xFF10192C))
+        id = "elephants-dream",
+        title = "Elephants Dream",
+        year = 2006,
+        duration = "10 min 54 s",
+        genre = "Sci-fi • Surrealistyczny",
+        description = "Dwóch mężczyzn przemierza ogromny, tajemniczy świat maszyn. Starszy z nich wierzy, że sam go stworzył.",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/cccc3e60-0291-4ecc-aa56-39b2e2c7d0d5-720.mp4",
+        posterUrl = "https://video.blender.org/lazy-static/thumbnails/cccc3e60-0291-4ecc-aa56-39b2e2c7d0d5.jpg",
+        sourceUrl = "https://orange.blender.org/",
+        credit = "Elephants Dream (2006) © Blender Foundation / Netherlands Media Art Institute",
+        license = "CC BY 2.5",
+        licenseUrl = "https://creativecommons.org/licenses/by/2.5/",
+        colors = listOf(Color(0xFF525E72), Color(0xFF161925))
     ),
     FreeMovie(
         id = "spring",
@@ -121,24 +129,43 @@ private val freeMovies = listOf(
         duration = "7 min 44 s",
         genre = "Fantasy • Animacja",
         description = "Pasterka i jej pies spotykają pradawne duchy. Muszą zmierzyć się z niezwykłą siłą natury, aby zachować cykl życia.",
-        streamUrl = "https://video.blender.org/static/webseed/3d95fb3d-c866-42c8-9db1-fe82f48ccb95-720.mp4",
-        posterUrl = "https://video.blender.org/lazy-static/thumbnails/3d95fb3d-c866-42c8-9db1-fe82f48ccb95.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/3d95fb3d-c866-42c8-9db1-fe82f48ccb95",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/3d95fb3d-c866-42c8-9db1-fe82f48ccb95-804.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/ea/65/ea65feaacf95911f39844e2ea97e68b5_m.webp",
         sourceUrl = "https://studio.blender.org/projects/spring/",
+        credit = "Spring (2019) © Blender Foundation",
+        license = "CC BY 4.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
         colors = listOf(Color(0xFF476B52), Color(0xFF172B35))
     ),
     FreeMovie(
-        id = "sprite-fright",
-        title = "Sprite Fright",
-        year = 2021,
-        duration = "10 min 30 s",
-        genre = "Horror • Komedia",
-        description = "Wycieczka nastolatków do odległego lasu szybko wymyka się spod kontroli, gdy odkrywają grzybowe stworzenia, które nie są tak bezbronne, jak wyglądają.",
-        streamUrl = "https://video.blender.org/download/videos/a69d68a5-a0e0-4a80-9d66-49f093c97aaf-720.mp4",
-        posterUrl = "https://video.blender.org/lazy-static/thumbnails/a69d68a5-a0e0-4a80-9d66-49f093c97aaf.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/a69d68a5-a0e0-4a80-9d66-49f093c97aaf",
-        sourceUrl = "https://studio.blender.org/projects/sprite-fright/",
-        colors = listOf(Color(0xFF6B3C55), Color(0xFF171A2D))
+        id = "coffee-run",
+        title = "Coffee Run",
+        year = 2020,
+        duration = "Krótkometrażowy",
+        genre = "Animacja • Obyczajowy",
+        description = "Nadmiar kawy napędza młodą kobietę w podróży przez wspomnienia dawnego związku.",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/ff8fe61b-026f-4f07-b66b-2a790d6f6ab1-804.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/7a/43/7a43fa6b0bc44e62f1cbb21473800e07_m.webp",
+        sourceUrl = "https://studio.blender.org/projects/coffee-run/",
+        credit = "Coffee Run (2020) © Blender Foundation",
+        license = "CC BY 4.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+        colors = listOf(Color(0xFF8E5E43), Color(0xFF261D2C))
+    ),
+    FreeMovie(
+        id = "wing-it",
+        title = "Wing It!",
+        year = 2023,
+        duration = "3 min 58 s",
+        genre = "Animacja • Komedia",
+        description = "Zbyt pewny siebie inżynier spotyka entuzjastycznego niedoszłego pilota. Ich kosmiczny lot szybko wymyka się spod kontroli.",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/1be4c93c-1fd2-498d-adc7-50126823033e-480.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/c2/6d/c26d3b56aeb6bc9bf1ba6ee8e27b7ccd_m.webp",
+        sourceUrl = "https://studio.blender.org/projects/wing-it/",
+        credit = "Wing It! (2023) © Blender Foundation",
+        license = "CC BY 4.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+        colors = listOf(Color(0xFF2C6991), Color(0xFF161E35))
     ),
     FreeMovie(
         id = "glass-half",
@@ -146,12 +173,29 @@ private val freeMovies = listOf(
         year = 2015,
         duration = "3 min 13 s",
         genre = "Animacja • Komedia",
-        description = "Krótka animacja o dwóch osobach, które zupełnie inaczej patrzą na ten sam obraz — i na świat.",
-        streamUrl = "https://video.blender.org/static/webseed/64222c8a-c4c7-4b3b-9850-7fb2078edcf6-720.mp4",
-        posterUrl = "https://video.blender.org/lazy-static/thumbnails/64222c8a-c4c7-4b3b-9850-7fb2078edcf6.jpg",
-        watchUrl = "https://video.blender.org/videos/watch/64222c8a-c4c7-4b3b-9850-7fb2078edcf6",
-        sourceUrl = "https://video.blender.org/videos/watch/64222c8a-c4c7-4b3b-9850-7fb2078edcf6",
+        description = "Dwóch krytyków sztuki w niezrozumiały sposób spiera się o obrazy w galerii. Ich rozmowa szybko wymyka się spod kontroli.",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/64222c8a-c4c7-4b3b-9850-7fb2078edcf6-1080.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/c6/3d/c63ddc47dd56cf369557e969f15e2cb644aa421a_m.webp",
+        sourceUrl = "https://studio.blender.org/projects/glass-half/",
+        credit = "Glass Half (2015) © Blender Foundation",
+        license = "CC BY 3.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/3.0/",
         colors = listOf(Color(0xFF9B6239), Color(0xFF2A1C2D))
+    ),
+    FreeMovie(
+        id = "caminandes-gran-dillama",
+        title = "Caminandes: Gran Dillama",
+        year = 2013,
+        duration = "2 min 26 s",
+        genre = "Animacja • Komedia",
+        description = "Lama Koro próbuje dostać się na drugą stronę płotu, by zjeść soczystą trawę. Prosta sprawa staje się komiczną przygodą.",
+        streamUrl = "https://video.blender.org/object-storage/web_videos/fb70d459-48d2-4db5-adba-813c84f9200a-1080.mp4",
+        posterUrl = "https://studio.blender.org/files/public/thumbnail/80/4b/804beb324d82e98db44d8308d9e6f495_m.webp",
+        sourceUrl = "https://caminandes.com/",
+        credit = "Caminandes 2: Gran Dillama (2013) © caminandes.com / Blender Institute",
+        license = "CC BY 3.0",
+        licenseUrl = "https://creativecommons.org/licenses/by/3.0/",
+        colors = listOf(Color(0xFF7F6D39), Color(0xFF1A2926))
     )
 )
 
@@ -271,7 +315,7 @@ private fun PremiumMovieCatalog(onWatch: (FreeMovie) -> Unit) {
 
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                text = "Katalog zawiera bezpłatne filmy z projektów Blender Open Movies, a nie płatne produkcje z Netflixa czy Disney+. Materiały są odtwarzane z serwisu Blender Video; szczegóły i warunki licencji znajdziesz na stronie źródłowej każdego filmu.",
+                text = "Katalog zawiera bezpłatne filmy z projektów Blender Open Movies, a nie płatne produkcje z Netflixa czy Disney+. Materiały są odtwarzane bezpośrednio z serwerów Blender Video. Informacje o autorach i licencjach pokazujemy przy każdym tytule.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp,
@@ -314,11 +358,7 @@ private fun FreeMovieCard(movie: FreeMovie, onWatch: () -> Unit) {
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color(0xE6000000))
-                            )
-                        )
+                        .background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color(0xE6000000))))
                         .padding(horizontal = 9.dp, vertical = 10.dp)
                 ) {
                     Text(
@@ -486,36 +526,50 @@ private fun PremiumMoviePlayer(movie: FreeMovie, onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface,
             lineHeight = 23.sp
         )
-        Text(
-            text = "Źródło: Blender Open Movies • ${movie.year}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
-            TextButton(
-                onClick = { runCatching { uriHandler.openUri(movie.sourceUrl) } }
+            Column(
+                modifier = Modifier.padding(13.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(17.dp)
+                Text(
+                    text = "Autorstwo",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text("Źródło i licencja")
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            TextButton(
-                onClick = { runCatching { uriHandler.openUri(movie.watchUrl) } }
-            ) {
-                Text("Otwórz player")
+                Text(
+                    text = movie.credit,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Licencja: ${movie.license}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = { runCatching { uriHandler.openUri(movie.sourceUrl) } }) {
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Źródło filmu")
+                    }
+                    TextButton(onClick = { runCatching { uriHandler.openUri(movie.licenseUrl) } }) {
+                        Text("Warunki licencji")
+                    }
+                }
             }
         }
         Text(
-            text = "Film odtwarza się bezpośrednio w tej zakładce. Jeśli transmisja nie ruszy, użyj przycisku „Otwórz player” albo spróbuj ponownie po chwili.",
+            text = "Odtwarzamy plik z serwera Blender Video w oryginalnej postaci. Jeśli wideo nie uruchomi się, sprawdź połączenie z internetem lub otwórz stronę źródłową.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             lineHeight = 18.sp
