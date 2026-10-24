@@ -25,10 +25,12 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,6 +63,7 @@ import com.example.ui.components.AppUpdatePromptHost
 import com.example.ui.screens.DiscoverScreen
 import com.example.ui.screens.MyListScreen
 import com.example.ui.screens.PremieresScreen
+import com.example.ui.screens.PremiumScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.KinoStreamTheme
 import com.example.ui.theme.RoyalBlue
@@ -215,7 +218,33 @@ fun MainAppScreen(viewModel: MainViewModel) {
                     )
                 )
 
-                // 3. Moja Lista
+                // 3. Premium — katalogi filmów dostępnych bez dodatkowej opłaty
+                NavigationBarItem(
+                    selected = currentTab == MainTab.PREMIUM,
+                    onClick = { viewModel.setTab(MainTab.PREMIUM) },
+                    icon = {
+                        Icon(
+                            imageVector = if (currentTab == MainTab.PREMIUM) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = "Premium"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Premium",
+                            fontSize = 11.sp,
+                            fontWeight = if (currentTab == MainTab.PREMIUM) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = RoyalBlue,
+                        indicatorColor = RoyalBlue,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+
+                // 4. Moja Lista
                 NavigationBarItem(
                     selected = currentTab == MainTab.MY_LIST,
                     onClick = { viewModel.setTab(MainTab.MY_LIST) },
@@ -255,7 +284,7 @@ fun MainAppScreen(viewModel: MainViewModel) {
                     )
                 )
 
-                // 4. Ustawienia
+                // 5. Ustawienia
                 NavigationBarItem(
                     selected = currentTab == MainTab.SETTINGS,
                     onClick = { viewModel.setTab(MainTab.SETTINGS) },
@@ -339,6 +368,10 @@ fun MainAppScreen(viewModel: MainViewModel) {
                         onToggleAutoAddNewReleases = viewModel::setAutoAddNewReleasesEnabled,
                         onSyncNewReleasesNow = viewModel::syncNewReleasesNow
                     )
+                }
+
+                MainTab.PREMIUM -> {
+                    PremiumScreen()
                 }
 
                 MainTab.MY_LIST -> {

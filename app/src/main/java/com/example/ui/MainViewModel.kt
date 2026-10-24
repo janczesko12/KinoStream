@@ -36,6 +36,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 enum class MainTab(val title: String) {
     DISCOVER("Katalog"),
     PREMIERES("Premiery"),
+    PREMIUM("Premium"),
     MY_LIST("Moja Lista"),
     SETTINGS("Ustawienia")
 }
