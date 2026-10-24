@@ -1,9 +1,10 @@
 package com.example.ui.screens
 
-import android.graphics.Color as AndroidColor
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -427,18 +429,33 @@ private fun FreeMovieCard(movie: FreeMovie, onWatch: () -> Unit) {
 @Composable
 private fun PremiumMoviePlayer(movie: FreeMovie, onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
-    val webViewHolder = remember(movie.id) { arrayOfNulls<WebView>(1) }
+    val context = LocalContext.current
+    var playbackError by remember(movie.id) { mutableStateOf<String?>(null) }
 
-    DisposableEffect(movie.id) {
-        onDispose {
-            webViewHolder[0]?.let { webView ->
-                runCatching {
-                    webView.stopLoading()
-                    webView.loadUrl("about:blank")
-                    webView.destroy()
+    val player = remember(movie.id) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(movie.streamUrl))
+            playWhenReady = true
+            prepare()
+        }
+    }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = "Nie udało się odtworzyć filmu (${error.errorCodeName})."
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    playbackError = null
                 }
             }
-            webViewHolder[0] = null
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
         }
     }
 
@@ -484,40 +501,57 @@ private fun PremiumMoviePlayer(movie: FreeMovie, onBack: () -> Unit) {
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    WebView(context).apply {
-                        setBackgroundColor(AndroidColor.BLACK)
-                        settings.javaScriptEnabled = false
-                        settings.domStorageEnabled = false
-                        settings.allowFileAccess = false
-                        settings.allowContentAccess = false
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.cacheMode = WebSettings.LOAD_DEFAULT
-                        webChromeClient = WebChromeClient()
-                        tag = movie.id
-                        webViewHolder[0] = this
-                        loadDataWithBaseURL(
-                            "https://video.blender.org/",
-                            moviePlayerHtml(movie),
-                            "text/html",
-                            "UTF-8",
-                            null
-                        )
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        this.player = player
+                        useController = true
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                        setKeepContentOnPlayerReset(true)
                     }
                 },
-                update = { webView ->
-                    if (webView.tag != movie.id) {
-                        webView.tag = movie.id
-                        webView.loadDataWithBaseURL(
-                            "https://video.blender.org/",
-                            moviePlayerHtml(movie),
-                            "text/html",
-                            "UTF-8",
-                            null
-                        )
+                update = { playerView ->
+                    if (playerView.player !== player) {
+                        playerView.player = player
                     }
                 }
             )
+        }
+
+        if (playbackError != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = "Problem z odtworzeniem",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = "${playbackError} Sprawdź internet albo otwórz stronę źródłową filmu.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    TextButton(
+                        onClick = { runCatching { uriHandler.openUri(movie.sourceUrl) } }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Otwórz stronę źródłową")
+                    }
+                }
+            }
         }
 
         Text(
@@ -529,7 +563,9 @@ private fun PremiumMoviePlayer(movie: FreeMovie, onBack: () -> Unit) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            )
         ) {
             Column(
                 modifier = Modifier.padding(13.dp),
@@ -569,29 +605,10 @@ private fun PremiumMoviePlayer(movie: FreeMovie, onBack: () -> Unit) {
             }
         }
         Text(
-            text = "Odtwarzamy plik z serwera Blender Video w oryginalnej postaci. Jeśli wideo nie uruchomi się, sprawdź połączenie z internetem lub otwórz stronę źródłową.",
+            text = "Film jest odtwarzany bezpośrednio w natywnym odtwarzaczu Androida z serwerów Blender Video. Jeśli źródło nie odpowiada, aplikacja pokaże komunikat zamiast pozostawiać pusty czarny ekran.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             lineHeight = 18.sp
         )
     }
 }
-
-private fun moviePlayerHtml(movie: FreeMovie): String = """
-    <!doctype html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-        <style>
-          html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-          video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
-        </style>
-      </head>
-      <body>
-        <video controls autoplay playsinline preload="metadata" poster="${movie.posterUrl}">
-          <source src="${movie.streamUrl}" type="video/mp4">
-          Twoja przeglądarka nie obsługuje odtwarzania tego filmu.
-        </video>
-      </body>
-    </html>
-""".trimIndent()
