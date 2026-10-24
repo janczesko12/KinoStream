@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -28,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,14 +45,14 @@ private data class FreeFilmSource(
 private val freeFilmSources = listOf(
     FreeFilmSource(
         name = "Ninateka",
-        subtitle = "Bezpłatnie • bez logowania i reklam",
-        description = "Filmy fabularne i dokumentalne, animacje, reportaże oraz materiały archiwalne z kolekcji Filmoteki Narodowej – Instytutu Audiowizualnego.",
-        url = "https://ninateka.pl/"
+        subtitle = "Darmowe filmy i polska klasyka",
+        description = "Otwiera bezpłatny katalog filmów i bajek w Ninatece — serwisie Filmoteki Narodowej – Instytutu Audiowizualnego. Wszystkie materiały w Ninatece są udostępniane bez opłat.",
+        url = "https://ninateka.pl/filmy?SearchQuery=&MediaType=&Paid=False&CategoryDenames=bajki%2Cfilm&YearFrom=1927&YearTo=2020&Transcription=False&SignLanguage=False&AudioDesc=False&Edu=False&EnglishVersion=False&Partner=&Subject=&Level=&Topic=&Desc=True&Sort=Recommended"
     ),
     FreeFilmSource(
         name = "35mm.online",
         subtitle = "Polskie kino i archiwalia",
-        description = "Platforma VOD WFDiF z polskimi filmami fabularnymi, dokumentami, kronikami filmowymi i animacjami.",
+        description = "Platforma VOD WFDiF z polskimi filmami fabularnymi, dokumentami, kronikami filmowymi i animacjami. Sprawdź dostępność konkretnego materiału na stronie.",
         url = "https://35mm.online/"
     ),
     FreeFilmSource(
