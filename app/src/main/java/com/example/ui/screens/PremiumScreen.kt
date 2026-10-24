@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -206,7 +207,7 @@ fun PremiumScreen() {
                             imageVector = Icons.Filled.OpenInNew,
                             contentDescription = null
                         )
-                        Spacer(modifier = Modifier.padding(horizontal = 3.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Otwórz katalog")
                     }
                 }
